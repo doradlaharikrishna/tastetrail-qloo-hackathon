@@ -35,6 +35,10 @@ Qloo is the core matching system, not a decorative API call. Search resolves the
 
 The first use case is the recurring office lunch decision, where a saved table makes the tool reusable from Monday to Friday. The same fair-overlap model can support friend groups choosing coffee, dinner, or a neighborhood activity, while preserving each person's visible contribution instead of collapsing a group into one “average” profile.
 
+## How Codex was used
+
+Codex helped turn the initial solo night-out planner into Common Table, implement the per-person Qloo workflow and MCP endpoint, refine the interface and place links, run fixture-backed and live end-to-end checks, and publish the app and project materials. The Qloo API calls and ranking are implemented directly in the server; no LLM-generated venue claims are presented as Qloo results.
+
 ## Technology
 
 - Dependency-free Node.js server with server-side Qloo API calls.
@@ -62,6 +66,15 @@ For a direct API request, send `POST /api/plan` with:
 
 The hosted MCP endpoint is `https://tastetrail-qloo-hackathon.vercel.app/mcp` and the web demo is `https://tastetrail-qloo-hackathon.vercel.app/`.
 
+## Screenshot shot list
+
+1. `screenshots/common-table-thumbnail.png` — Common Table's lunch-table interface and taste-profile setup; used as the project thumbnail.
+2. `screenshots/common-table-live.png` — the live Qloo Bengaluru shortlist, individual affinities, venue tags, and Maps actions; uploaded to the Devpost project gallery.
+
+## Demo video outline
+
+The event does not require a demo video. If one is recorded: open the lunch-decision problem; run the Bengaluru example; show the shared restaurant overlap and each person's Qloo fit; open a map search; finish by showing the `find_shared_lunch` MCP tool.
+
 ## Links
 
 - Demo: https://tastetrail-qloo-hackathon.vercel.app/
@@ -73,4 +86,5 @@ The hosted MCP endpoint is `https://tastetrail-qloo-hackathon.vercel.app/mcp` an
 - Project start date: October 6, 2026.
 - Demo URL: https://tastetrail-qloo-hackathon.vercel.app/
 - Repository URL: https://github.com/doradlaharikrishna/tastetrail-qloo-hackathon
+- Existing-project upgrade answer: TasteTrail was created for this hackathon and rebuilt as Common Table with multi-person Qloo affinity intersection, fair shared ranking, an MCP tool, and correct Maps search links.
 - Demo video: the Qloo Agentic Hackathon does not require one.
