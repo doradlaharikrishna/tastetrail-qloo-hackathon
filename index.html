@@ -3,99 +3,74 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#f5f2ec" />
-    <meta name="description" content="TasteTrail makes a night out feel like yours, with recommendations grounded in what you love." />
-    <title>TasteTrail — a night that feels like you</title>
+    <meta name="theme-color" content="#f8f5eb" />
+    <meta name="description" content="Common Table finds a lunch spot your whole crew can agree on, using each person's taste and Qloo affinity." />
+    <title>Common Table — make lunch a group decision</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="./styles.css" />
     <script src="./app.js" defer></script>
   </head>
   <body>
-    <div class="page-shell">
+    <div class="page-shell" id="top">
       <header class="topbar">
-        <a class="brand" href="#top" aria-label="TasteTrail home">
-          <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
-          <span>taste<span class="brand-light">trail</span></span>
-        </a>
-        <div class="topbar-right">
-          <span class="demo-pill" id="mode-pill"><span class="pulse-dot"></span> Preview mode</span>
-          <button class="avatar" type="button" aria-label="Your profile">Y</button>
-        </div>
+        <a class="brand" href="#top" aria-label="Common Table home"><span class="brand-mark" aria-hidden="true">✳</span><span>common<span>table</span></span></a>
+        <div class="topbar-right"><span class="mode-pill" id="mode-pill"><i></i> Connecting to Qloo</span><a class="how-link" href="#how-it-works">How it works <span aria-hidden="true">↘</span></a></div>
       </header>
 
-      <main id="top">
-        <section class="intro" aria-labelledby="page-title">
-          <p class="eyebrow"><span class="eyebrow-line"></span> YOUR TASTE, OUT IN THE WORLD</p>
-          <h1 id="page-title">A night that<br /><em>feels like you.</em></h1>
-          <p class="intro-copy">Tell us what you love. We’ll find the places, flavors, and little detours that make a night yours.</p>
+      <main>
+        <section class="hero">
+          <div class="hero-copy">
+            <p class="eyebrow"><span></span> THE DAILY “WHERE SHOULD WE EAT?” SOLVED</p>
+            <h1>Lunch your whole table can <em>say yes to.</em></h1>
+            <p class="hero-intro">Different tastes. One lunch break. Common Table finds the restaurants Qloo already likes for everyone, then ranks the fairest overlap.</p>
+            <button class="example-button" id="example-button" type="button"><span class="example-icon">↗</span> See a live example <span class="example-note">Bengaluru · two very different tastes</span></button>
+          </div>
+          <div class="hero-art" aria-hidden="true">
+            <div class="sunburst">THE<br />LUNCH<br />TABLE</div>
+            <div class="plate plate-back"></div><div class="plate plate-front"><span>↗</span></div>
+            <div class="art-caption">GOOD TASTE<br />IS BETTER SHARED</div>
+            <span class="art-spark spark-one">✳</span><span class="art-spark spark-two">✳</span>
+          </div>
         </section>
 
         <section class="planner-card" aria-labelledby="planner-title">
           <div class="planner-heading">
-            <div>
-              <p class="section-kicker">LET’S MAKE A PLAN</p>
-              <h2 id="planner-title">What sounds good?</h2>
-            </div>
-            <span class="step-count">01 <span>/ 01</span></span>
+            <div><p class="section-kicker">BUILD YOUR TABLE</p><h2 id="planner-title">Who’s deciding today?</h2></div>
+            <span class="tiny-label">2–4 PEOPLE <b>·</b> ABOUT 30 SECONDS</span>
           </div>
-
           <form id="planner-form">
-            <div class="form-grid">
+            <div class="city-row">
               <div class="field city-field">
-                <label class="field-label" for="city">Where are you going?</label>
-                <div class="city-control">
-                  <span class="input-wrap"><span class="field-icon" aria-hidden="true">⌖</span><input id="city" name="city" value="Brooklyn, NY" autocomplete="off" role="combobox" aria-autocomplete="list" aria-haspopup="listbox" aria-controls="city-suggestions" aria-expanded="false" required /></span>
-                  <div class="city-suggestions" id="city-suggestions" role="listbox" aria-label="City suggestions" hidden></div>
-                </div>
+                <label class="field-label" for="city">Where are you eating?</label>
+                <div class="city-control"><div class="input-wrap"><span class="field-icon" aria-hidden="true">⌖</span><input id="city" name="city" value="Bengaluru" autocomplete="off" role="combobox" aria-autocomplete="list" aria-haspopup="listbox" aria-controls="city-suggestions" aria-expanded="false" required /></div><div class="city-suggestions" id="city-suggestions" role="listbox" aria-label="City suggestions" hidden></div></div>
+                <span class="field-hint">City or neighborhood</span>
               </div>
-              <label class="field">
-                <span class="field-label">What kind of night?</span>
-                <span class="select-wrap"><span class="field-icon" aria-hidden="true">✳</span><select id="occasion" name="occasion"><option value="A little of everything">A little of everything</option><option value="Dinner and a good conversation">Dinner and a good conversation</option><option value="Something unexpected">Something unexpected</option><option value="A cozy night out">A cozy night out</option></select><span class="chevron">⌄</span></span>
-              </label>
+              <label class="remember-toggle"><input id="remember-table" type="checkbox" /><span class="toggle-track"><i></i></span><span><strong>Remember our table</strong><small>Saved only on this device</small></span></label>
             </div>
 
-            <label class="field taste-field">
-              <span class="field-label">A few things you love <span class="optional">REQUIRED FOR LIVE RESULTS</span></span>
-              <span class="input-wrap"><span class="field-icon" aria-hidden="true">♡</span><input id="favorites" name="favorites" placeholder="Try: natural wine, jazz, Japanese cinema…" /></span>
-              <span class="field-hint">Add 1–4 artists, films, or places. Qloo uses these to shape your trail.</span>
-            </label>
+            <div class="people-heading"><span class="field-label">Add one or two things each person genuinely loves</span><span class="anchor-tip">Artists, athletes, films, brands, places</span></div>
+            <div class="people-grid" id="people-grid"></div>
+            <div class="table-actions"><button class="text-button" id="add-person" type="button">＋ Add a person <span>(up to 4)</span></button><span class="privacy-note">No account. No group chat needed.</span></div>
 
             <div class="form-footer">
-              <div class="taste-note"><span class="sparkle" aria-hidden="true">✦</span><span>Made for your taste, not the masses.</span></div>
-              <button class="primary-button" type="submit"><span>Find my night</span><span class="button-arrow" aria-hidden="true">↗</span></button>
+              <div class="method-note"><span class="method-icon">◎</span><span><strong>Fair by design</strong><small>A one-person favorite can’t win for the whole table.</small></span></div>
+              <button class="primary-button" type="submit"><span>Find our overlap</span><span aria-hidden="true">→</span></button>
             </div>
           </form>
         </section>
 
         <section class="results" id="results" aria-live="polite" aria-labelledby="results-title">
-          <div class="results-heading">
-            <div>
-              <p class="section-kicker">A TASTETRAIL FOR YOU</p>
-              <h2 id="results-title">Your kind of evening</h2>
-            </div>
-            <div class="results-actions">
-              <button class="refresh-button" id="refresh-button" type="button" hidden>Try another trail <span aria-hidden="true">↻</span></button>
-              <span class="sample-badge"><span class="sample-dot"></span> <span id="result-badge">SAMPLE PICKS</span></span>
-            </div>
-          </div>
-          <p class="results-context" id="results-context">A warm, unhurried route through Brooklyn — with room for one happy surprise.</p>
-
-          <div class="route-line" aria-hidden="true"><span></span><span></span><span></span></div>
+          <div class="results-heading"><div><p class="section-kicker">THE COMMON GROUND</p><h2 id="results-title">A better lunch starts here.</h2></div><div class="results-actions"><button class="refresh-button" id="refresh-button" type="button" hidden>Show another set <span aria-hidden="true">↻</span></button><span class="result-badge" id="result-badge">READY WHEN YOU ARE</span></div></div>
+          <p class="results-context" id="results-context">Add your table above. We’ll look for actual restaurants appearing in each person’s Qloo recommendations.</p>
           <div class="recommendations" id="recommendations"></div>
-
-          <div class="results-footnote">
-            <span class="footnote-icon" aria-hidden="true">✦</span>
-            <p id="results-note"><strong>Why these?</strong> Sample recommendations are shown until the Qloo API key is configured on the server.</p>
-          </div>
+          <div class="results-footnote" id="results-note"><span class="footnote-icon" aria-hidden="true">✳</span><p><strong>Why these picks?</strong> Qloo surfaced every restaurant here for everyone at the table. The scores above show how well each place matches each person’s taste.</p></div>
         </section>
 
-        <footer class="page-footer">
-          <span>TasteTrail <span class="footer-separator">·</span> A Qloo-powered discovery concept</span>
-          <span>Made with curiosity <span aria-hidden="true">✳</span></span>
-        </footer>
+        <section class="how-section" id="how-it-works"><p class="section-kicker">NOT ANOTHER RANDOM TOP TEN</p><h2>Three things make a pick feel fair.</h2><div class="how-grid"><article><span class="how-number">01</span><h3>Everyone gets their own Qloo read</h3><p>We resolve each person’s taste anchors, then ask Qloo for nearby restaurants for that person.</p></article><article><span class="how-number">02</span><h3>Only real overlap survives</h3><p>A venue must appear in every person’s Qloo result set. A strong match for one person can’t carry the vote.</p></article><article><span class="how-number">03</span><h3>The whole table shapes the order</h3><p>We balance everyone’s Qloo fit, so a place that works well for the group comes first. Map links search the venue’s name and address.</p></article></div></section>
       </main>
+      <footer class="page-footer"><span>Common Table <i>·</i> a Qloo Agentic Hackathon project</span><span>Make the lunch break count <b>✳</b></span></footer>
     </div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </body>

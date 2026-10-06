@@ -14,6 +14,7 @@ const rateLimit = 18;
 const requestsByIp = new Map();
 const citySearchesByIp = new Map();
 const citySuggestionCache = new Map();
+const favoriteCache = new Map();
 const entityTypes = ["urn:entity:person", "urn:entity:artist", "urn:entity:movie", "urn:entity:place"];
 const sampleStops = [
   { title: "The candlelit table", meta: "Dinner · Japanese comfort food", reason: "A familiar favorite, with a menu that leaves room to explore." },
@@ -64,7 +65,6 @@ function publicPlace(entity, { matchedFavorites, occasion }) {
   const addressText = typeof address === "string"
     ? address
     : [address.street, address.locality, address.region, address.postal_code].filter(Boolean).join(", ");
-  const site = properties.website || properties.url || entity?.url || "";
   const rawKind = entity?.subtype || entity?.type || "place";
   const kind = rawKind.replace(/^urn:entity:/, "").replace(/[_-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
   const signalNames = new Map(matchedFavorites.map((favorite) => [favorite.id, favorite.name]));
@@ -93,9 +93,14 @@ function publicPlace(entity, { matchedFavorites, occasion }) {
     name: entity?.name || properties.name || "A local favorite",
     kind: occasion === "Dinner and a good conversation" ? "Restaurant" : kind,
     location: addressText || [geocode.name, geocode.city].filter(Boolean).join(", "),
-    url: typeof site === "string" && /^https?:\/\//i.test(site) ? site : "",
+    url: googleMapsUrl(entity?.name || properties.name, addressText, geocode.city),
     reason: reasons.join(" · ")
   };
+}
+
+function googleMapsUrl(name, address, city) {
+  const query = [name, address, city].filter(Boolean).join(", ");
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 }
 
 async function readJsonBody(request) {
@@ -221,13 +226,16 @@ async function lookupFavorite(query) {
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
   const normalizedQuery = normalize(query);
+  const cached = favoriteCache.get(normalizedQuery);
+  if (cached && cached.expiresAt > Date.now()) return cached.match;
   const queryTokens = new Set(normalizedQuery.split(" ").filter(Boolean));
   const typePriority = new Map([["urn:entity:person", 0], ["urn:entity:artist", 1], ["urn:entity:movie", 2], ["urn:entity:place", 3]]);
-  const attempts = entityTypes.map(async (type) => {
+  const matches = [];
+  for (const type of entityTypes) {
     const search = new URLSearchParams({ query, type });
     try {
       const payload = await qlooRequest(`/search?${search}`);
-      return resultEntities(payload)
+      matches.push(...resultEntities(payload)
         .filter((entity) => entityId(entity) && entity.name)
         .map((entity) => {
           const name = normalize(entity.name);
@@ -240,15 +248,17 @@ async function lookupFavorite(query) {
               ? 60
               : 0;
           return { id: entityId(entity), name: entity.name, type, score };
-        });
+        }));
+      if (matches.some((match) => match.score === 100)) break;
     } catch (error) {
       if ([401, 403, 404, 429].includes(error.upstreamStatus) || error.upstreamStatus >= 500) throw error;
-      return [];
     }
-  });
-  const matches = (await Promise.all(attempts)).flat().filter((match) => match.score > 0);
-  if (!matches.length) return null;
-  return matches.sort((left, right) => right.score - left.score || typePriority.get(left.type) - typePriority.get(right.type))[0];
+  }
+  const match = matches.filter((candidate) => candidate.score > 0)
+    .sort((left, right) => right.score - left.score || typePriority.get(left.type) - typePriority.get(right.type))[0] || null;
+  favoriteCache.set(normalizedQuery, { match, expiresAt: Date.now() + 30 * 60 * 1000 });
+  if (favoriteCache.size > 500) favoriteCache.delete(favoriteCache.keys().next().value);
+  return match;
 }
 
 async function liveTrail({ city, favorites, occasion, excludeIds }) {
@@ -293,6 +303,255 @@ async function liveTrail({ city, favorites, occasion, excludeIds }) {
     city,
     occasion
   };
+}
+
+function balancedAffinity(scores) {
+  const validScores = scores.filter((score) => Number.isFinite(score) && score > 0);
+  if (validScores.length !== scores.length || !validScores.length) return 0;
+  return validScores.length / validScores.reduce((total, score) => total + (1 / score), 0);
+}
+
+async function sharedLunchPlan({ city, participants, excludeIds = [] }) {
+  city = cleanText(city, 90);
+  participants = Array.isArray(participants) ? participants.slice(0, 4).map((participant, index) => ({
+    name: cleanText(participant?.name, 40) || `Person ${index + 1}`,
+    favorites: Array.isArray(participant?.favorites)
+      ? participant.favorites.map((favorite) => cleanText(favorite, 80)).filter(Boolean).slice(0, 3)
+      : []
+  })) : [];
+  if (!city) throw Object.assign(new Error("Add a city to find a shared lunch."), { status: 400 });
+  if (participants.length < 2) throw Object.assign(new Error("Add at least two people so we can find a fair match."), { status: 400 });
+  if (participants.some((participant) => !participant.favorites.length)) {
+    throw Object.assign(new Error("Add at least one taste anchor for each person at the table."), { status: 400 });
+  }
+  excludeIds = Array.isArray(excludeIds) ? excludeIds.map((id) => cleanText(id, 100)).filter((id) => /^[\w-]+$/.test(id)).slice(0, 15) : [];
+  if (!qlooApiKey) {
+    return {
+      mode: "preview",
+      city,
+      participants: participants.map(({ name, favorites }) => ({ name, matchedFavorites: favorites })),
+      places: []
+    };
+  }
+
+  const resolvedParticipants = await Promise.all(participants.map(async (participant, index) => {
+    const favorites = (await Promise.all(participant.favorites.map(lookupFavorite))).filter(Boolean);
+    if (!favorites.length) {
+      throw Object.assign(new Error(`I couldn’t confidently match ${participant.name}’s taste anchors. Try a specific person, artist, film, brand, or place.`), { status: 422 });
+    }
+    return { id: `person-${index + 1}`, name: participant.name, favorites };
+  }));
+
+  const perPersonResults = await Promise.all(resolvedParticipants.map(async (participant) => {
+    const body = {
+      "filter.type": "urn:entity:place",
+      "filter.tags": "urn:tag:category:place:restaurant",
+      "signal.interests.entities": participant.favorites.map((favorite) => favorite.id),
+      "filter.location.query": city,
+      "filter.location.radius": 0,
+      "take": 50,
+      "feature.explainability": true
+    };
+    if (excludeIds.length) body["filter.exclude.entities"] = excludeIds.join(",");
+    const insight = await qlooRequest("/v2/insights", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    return { participant, entities: resultEntities(insight) };
+  }));
+
+  const candidates = new Map();
+  for (const { participant, entities } of perPersonResults) {
+    for (const entity of entities) {
+      const id = entityId(entity);
+      const name = cleanText(entity?.name, 140);
+      if (!id || !name || /\b(hotel|resort|hostel|motel|guest house|lodging)\b/i.test(name)) continue;
+      const affinity = Number(entity?.query?.affinity);
+      if (!Number.isFinite(affinity) || affinity <= 0) continue;
+      const candidate = candidates.get(id) || { entity, affinities: new Map(), signalNames: new Map() };
+      candidate.affinities.set(participant.id, affinity);
+      const explainedSignals = entity?.query?.explainability?.["signal.interests.entities"] || [];
+      const participantSignals = new Map(participant.favorites.map((favorite) => [favorite.id, favorite.name]));
+      const matched = explainedSignals
+        .filter((signal) => signal.score >= 0.1 && participantSignals.has(signal.entity_id))
+        .sort((left, right) => right.score - left.score)
+        .map((signal) => participantSignals.get(signal.entity_id));
+      candidate.signalNames.set(participant.id, matched);
+      candidates.set(id, candidate);
+    }
+  }
+
+  const ranked = [...candidates.values()]
+    .filter((candidate) => candidate.affinities.size === resolvedParticipants.length)
+    .map((candidate) => {
+      const scores = resolvedParticipants.map((participant) => candidate.affinities.get(participant.id));
+      return { ...candidate, balancedFit: balancedAffinity(scores) };
+    })
+    .sort((left, right) => right.balancedFit - left.balancedFit)
+    .slice(0, 3);
+
+  if (!ranked.length) {
+    throw Object.assign(new Error("Qloo didn’t find a restaurant that ranked for everyone yet. Add one more taste anchor for each person or try a broader city."), { status: 404 });
+  }
+
+  const places = ranked.map(({ entity, balancedFit, affinities, signalNames }) => {
+    const address = entity?.properties?.address;
+    const addressText = typeof address === "string"
+      ? address
+      : [address?.street, address?.locality, address?.region, address?.postal_code].filter(Boolean).join(", ");
+    const geocode = entity?.properties?.geocode || {};
+    const location = addressText || [geocode.name, geocode.city, geocode.admin1_region].filter(Boolean).join(", ") || city;
+    const tags = (entity?.tags || [])
+      .filter((tag) => /^(urn:tag:(ambience|decor|interests|time_of_day_fit|menu_highlight|cuisine):)/.test(tag.type || ""))
+      .map((tag) => cleanText(tag.name, 60))
+      .filter(Boolean)
+      .slice(0, 2);
+    const affinityByParticipant = resolvedParticipants.map((participant) => ({
+      name: participant.name,
+      score: affinities.get(participant.id),
+      signals: signalNames.get(participant.id) || []
+    }));
+    const reason = [
+      `Balanced Qloo fit ${balancedFit.toFixed(2)}`,
+      ...affinityByParticipant.map(({ name, score }) => `${name}: ${score.toFixed(2)}`),
+      tags.length ? `Qloo tags: ${tags.join(", ")}` : ""
+    ].filter(Boolean).join(" · ");
+    return {
+      id: entityId(entity),
+      name: entity.name,
+      kind: "Restaurant",
+      location,
+      url: googleMapsUrl(entity.name, addressText || location, city),
+      balancedFit,
+      affinityByParticipant,
+      tags,
+      reason
+    };
+  });
+
+  return {
+    mode: "live",
+    city,
+    occasion: "Lunch",
+    participantNames: resolvedParticipants.map(({ name }) => name),
+    matchedFavorites: resolvedParticipants.map(({ name, favorites }) => ({ name, favorites: favorites.map(({ name }) => name) })),
+    ranking: "harmonic-mean-of-individual-qloo-affinity",
+    places
+  };
+}
+
+async function handleSharedLunch(request, response) {
+  if (isRateLimited(request)) return sendJson(response, 429, { error: "Please pause a moment before planning another shared lunch." });
+  try {
+    const input = await readJsonBody(request);
+    const city = cleanText(input.city, 90);
+    const rawParticipants = Array.isArray(input.participants) ? input.participants.slice(0, 4) : [];
+    const participants = rawParticipants.map((participant, index) => ({
+      name: cleanText(participant?.name, 40) || `Person ${index + 1}`,
+      favorites: Array.isArray(participant?.favorites)
+        ? participant.favorites.map((favorite) => cleanText(favorite, 80)).filter(Boolean).slice(0, 3)
+        : cleanText(participant?.favorites, 240).split(",").map((favorite) => cleanText(favorite, 80)).filter(Boolean).slice(0, 3)
+    }));
+    const excludeIds = Array.isArray(input.excludeIds)
+      ? input.excludeIds.map((id) => cleanText(id, 100)).filter((id) => /^[\w-]+$/.test(id)).slice(0, 15)
+      : [];
+    if (!city) return sendJson(response, 400, { error: "Add a city to find a shared lunch." });
+    if (participants.length < 2) return sendJson(response, 400, { error: "Add at least two people so we can find a fair match." });
+    if (participants.some((participant) => !participant.favorites.length)) {
+      return sendJson(response, 400, { error: "Add at least one taste anchor for each person at the table." });
+    }
+    const result = await sharedLunchPlan({ city, participants, excludeIds });
+    return sendJson(response, 200, result);
+  } catch (error) {
+    return sendJson(response, error.status || 500, {
+      error: error.status ? error.message : "The lunch planner couldn’t reach Qloo. Please try again in a moment."
+    });
+  }
+}
+
+const mcpTool = {
+  name: "find_shared_lunch",
+  title: "Find a shared lunch spot",
+  description: "Resolve each person's cultural taste anchors with Qloo, request restaurant recommendations separately for each person, and rank only venues that appear in everyone's results using a balanced harmonic-mean affinity score. Returns Qloo affinity details and a Google Maps search link built from the place name and address.",
+  inputSchema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["city", "participants"],
+    properties: {
+      city: { type: "string", description: "A city or locality name, such as Bengaluru." },
+      participants: {
+        type: "array",
+        minItems: 2,
+        maxItems: 4,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["name", "favorites"],
+          properties: {
+            name: { type: "string", description: "Display name for this person's taste profile." },
+            favorites: { type: "array", minItems: 1, maxItems: 3, items: { type: "string" }, description: "One to three specific artists, people, films, brands, or places this person likes." }
+          }
+        }
+      }
+    }
+  }
+};
+
+async function handleMcp(request, response) {
+  if (request.method !== "POST") return response.writeHead(405, { allow: "POST" }).end("Method not allowed");
+  const origin = request.headers.origin;
+  if (origin) {
+    let parsedOrigin;
+    try { parsedOrigin = new URL(origin); } catch { return response.writeHead(403).end(); }
+    const host = parsedOrigin.hostname.toLowerCase();
+    const localOrigin = ["localhost", "127.0.0.1", "::1"].includes(host);
+    const appOrigin = host === "tastetrail-qloo-hackathon.vercel.app"
+      || (host.startsWith("tastetrail-qloo-hackathon-") && host.endsWith(".vercel.app"));
+    if ((!localOrigin && !appOrigin) || !["http:", "https:"].includes(parsedOrigin.protocol)) return response.writeHead(403).end();
+  }
+  if (request.method === "GET") return response.writeHead(405, { allow: "POST" }).end();
+  const accept = request.headers.accept || "";
+  if (!accept.includes("application/json") || !accept.includes("text/event-stream")) {
+    return sendJson(response, 406, { error: "MCP clients must accept application/json and text/event-stream." });
+  }
+  let message;
+  try { message = await readJsonBody(request); } catch (error) { return sendJson(response, error.status || 400, { error: error.message }); }
+  if (Array.isArray(message)) return sendJson(response, 400, { error: "Send one JSON-RPC request per MCP call." });
+  if (!message || message.jsonrpc !== "2.0" || typeof message.method !== "string") {
+    return sendJson(response, 400, { error: "Send a valid JSON-RPC 2.0 request." });
+  }
+  if (message.method.startsWith("notifications/")) return response.writeHead(202).end();
+
+  let result;
+  if (message.method === "initialize") {
+    result = {
+      protocolVersion: "2025-03-26",
+      capabilities: { tools: {} },
+      serverInfo: { name: "common-table-qloo", version: "1.0.0" }
+    };
+  } else if (message.method === "ping") {
+    result = {};
+  } else if (message.method === "tools/list") {
+    result = { tools: [mcpTool] };
+  } else if (message.method === "tools/call") {
+    if (isRateLimited(request)) {
+      return sendJson(response, 429, { jsonrpc: "2.0", id: message.id, error: { code: -32000, message: "Please pause a moment before planning another shared lunch." } });
+    }
+    if (message.params?.name !== mcpTool.name) {
+      return sendJson(response, 200, { jsonrpc: "2.0", id: message.id, error: { code: -32602, message: "Unknown tool." } });
+    }
+    try {
+      const plan = await sharedLunchPlan(message.params?.arguments || {});
+      result = { content: [{ type: "text", text: JSON.stringify(plan) }], structuredContent: plan, isError: false };
+    } catch (error) {
+      result = { content: [{ type: "text", text: error.message || "The shared lunch tool failed." }], isError: true };
+    }
+  } else {
+    return sendJson(response, 200, { jsonrpc: "2.0", id: message.id, error: { code: -32601, message: "Method not found." } });
+  }
+  if (message.id === undefined) return response.writeHead(202).end();
+  return sendJson(response, 200, { jsonrpc: "2.0", id: message.id, result });
 }
 
 export async function handleTrail(request, response) {
@@ -377,6 +636,8 @@ export default async function handler(request, response) {
     }
   }
   if (request.method === "POST" && url.pathname === "/api/trail") return handleTrail(request, response);
+  if (request.method === "POST" && url.pathname === "/api/plan") return handleSharedLunch(request, response);
+  if (url.pathname === "/mcp") return handleMcp(request, response);
   if (url.pathname.startsWith("/api/")) return sendJson(response, 404, { error: "Not found." });
   if (request.method !== "GET" && request.method !== "HEAD") {
     response.writeHead(405, { allow: "GET, HEAD" }).end("Method not allowed");
@@ -389,6 +650,6 @@ const server = createServer(handler);
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   server.listen(port, "0.0.0.0", () => {
-    console.log(`TasteTrail ready on port ${port} (${qlooApiKey ? "Qloo API configured" : "preview mode"}).`);
+    console.log(`Common Table ready on port ${port} (${qlooApiKey ? "Qloo API configured" : "preview mode"}).`);
   });
 }

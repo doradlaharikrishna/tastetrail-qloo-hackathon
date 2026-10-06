@@ -1,101 +1,76 @@
-# TasteTrail
+# Common Table
 
-## One-line Summary
+## Tagline
 
-Turn a few cultural favorites and a city into a Qloo-powered, personalized three-stop local outing.
+Lunch your whole table can say yes to.
 
-## Problem
+## Project summary
 
-Choosing where to go often means stitching together generic search results that do not reflect what a person actually enjoys. Someone who likes particular music, films, or places needs recommendations grounded in those tastes, not just popularity or keywords.
+Common Table solves a surprisingly frequent problem: the team lunch chat that never reaches a decision. Two to four people add a few cultural favorites and a city. Common Table asks Qloo for a separate restaurant ranking for every person, keeps only the actual restaurant entities present in everyone's Qloo results, then ranks that overlap with a harmonic mean of their individual affinities. The result is a shortlist where one person's strong preference cannot drown out everyone else's fit.
 
-## Solution
+Each pick shows the Qloo affinity for each person and any useful venue tags Qloo returned. Map search URLs are built from the exact place name and address. A table can be remembered on one device for the next workday; no account or group-chat setup is required. The same planner is exposed as an MCP tool so an AI assistant can find a fair lunch spot from a natural-language request.
 
-TasteTrail is a taste-aware local-discovery planner. A person enters a city and up to four cultural favorites. The server searches Qloo for matching artists, films, or places, selects the closest name match, sends those entity IDs and the city to Qloo Insights with strict locality filtering, and presents up to three recommended places. “Try another trail” excludes the previous results and requests another set.
+## The problem
 
-The recommendation workflow is exposed as a simple HTTP endpoint that another assistant can call: provide a city and cultural signals, and it resolves those signals before requesting Qloo-ranked places. The Qloo taste graph is the core of the matching step; the app uses returned place recommendations rather than inventing them with generic text.
+Group lunch is a small decision people repeat almost every day. Generic “near me” lists rank popularity or proximity, while a group chat makes the person who suggests first disproportionately influential. A venue that one person loves and everyone else dislikes is not a good group recommendation.
 
-## Why This Matters
+## How it works
 
-Local discovery is more useful when it reflects a person’s cultural interests. TasteTrail demonstrates a direct path from familiar artists, films, or places to a city-specific outing, with Qloo supplying the taste-based ranking.
+1. Each diner enters one to three artists, athletes, films, brands, or places they like.
+2. Common Table resolves each anchor through Qloo Search.
+3. It calls Qloo Insights independently for each diner, asking for restaurants in the chosen city and enabling explainability.
+4. It intersects the restaurant entity IDs returned for all diners; a venue must appear in every person's result set.
+5. It calculates a harmonic mean across Qloo affinity scores and explains the shortlist with individual scores, taste signals, and Qloo tags.
+6. “Show another set” excludes the current places. The map action searches the restaurant's exact name and address.
 
-## How We Used AI
+## What is agentic
 
-TasteTrail uses Qloo Taste AI through two live API stages: it resolves each supplied favorite through `/search`, then requests place recommendations from `/v2/insights` using the matched entity IDs and the selected city. The server returns Qloo’s place results to the interface. It does not claim to use an LLM; the recommendation intelligence in this build comes from Qloo.
+The production app exposes `find_shared_lunch` at `/mcp` as a Model Context Protocol Streamable HTTP tool. An assistant can supply a city and two to four taste profiles, then use structured restaurant results, per-person affinities, and map search URLs in its response. The MCP endpoint shares the exact same Qloo-backed planning logic as the web UI rather than a mock path.
 
-## How We Used Codex
+## Use of Qloo Taste AI
 
-Codex helped create the responsive web interface, the Node.js server, the server-side Qloo integration, deployment setup, and usage documentation. It checked the live Qloo search candidates, improved entity matching so an exact artist name outranks a longer venue name, and verified the local end-to-end API path. The public hosted app was also exercised in a browser and returned live Qloo results. The Qloo key remains a server-side environment variable.
+Qloo is the core matching system, not a decorative API call. Search resolves the user's cultural anchors to Qloo entity IDs; separate Insights calls produce the taste-conditioned, locality-filtered restaurant lists; Qloo affinity and explainability data power the intersection, fairness ranking, and visible evidence. Common Table does not invent venue recommendations with generated text. It does not claim real-time opening hours, reservations, diet suitability, or verified business websites.
 
-## Key Features
+## Potential impact
 
-- Enter a city and up to four artists, films, or places as taste signals.
-- Resolve taste signals with Qloo Search, preferring the closest name match across artist, movie, and place entities.
-- Request strictly city-bounded place recommendations from Qloo Insights through a workflow callable by an assistant.
-- Show a concise three-stop trail with place details returned by Qloo.
-- Request a different trail while excluding previous results.
-- Keep the Qloo API key on the server in an ignored `.env` file; never send it to the browser.
-- Use clearly labeled sample stops in preview mode when no API key is configured.
+The first use case is the recurring office lunch decision, where a saved table makes the tool reusable from Monday to Friday. The same fair-overlap model can support friend groups choosing coffee, dinner, or a neighborhood activity, while preserving each person's visible contribution instead of collapsing a group into one “average” profile.
 
-## Architecture
+## Technology
 
-- **Interface:** plain HTML, CSS, and browser JavaScript.
-- **Server:** Node.js built-in HTTP server serves the interface and accepts trail requests.
-- **Qloo:** server-side `X-Api-Key` requests to `/search` and `/v2/insights` at the Qloo Hackathon API.
-- **Secrets:** `QLOO_API_KEY` is read from the local `.env` file; `.env` is excluded from the source repository.
-- **License:** MIT, included in `LICENSE`.
+- Dependency-free Node.js server with server-side Qloo API calls.
+- Accessible, responsive HTML, CSS, and browser JavaScript interface.
+- Qloo `/search` plus per-participant `/v2/insights` requests with restaurant and locality filters and explainability enabled.
+- MCP Streamable HTTP endpoint with `initialize`, `ping`, `tools/list`, and `tools/call` for `find_shared_lunch`.
+- Optional local table memory in browser storage; API credentials remain server-side.
+- MIT-licensed public source repository.
 
-## Testing Instructions
+## Run and verify
 
-1. Install a current Node.js release.
-2. Copy `.env.example` to `.env` and set `QLOO_API_KEY` to a valid Qloo Hackathon API key. Do not publish `.env`.
-3. Run `npm start` from the project folder.
-4. Open the local app, enter a city and one or more specific favorites, and create a trail. Confirm that the app shows live Qloo results rather than the sample preview.
-5. Select “Try another trail” and confirm that a different result set is requested.
+Use Node.js 20 or newer. Set `QLOO_API_KEY` in an ignored local `.env`, run `npm start`, and open `http://localhost:3000`. Add two or more distinct participants, a city, and one or more specific taste anchors per person. The UI should display only common Qloo restaurant results with each person's affinity and a map search based on the result's name and address. Try the example action for a prepared Bengaluru pair.
 
-Verified so far: `node --check` passes for the server, browser script, and endpoint handlers. A local end-to-end request using the configured key returned HTTP 200 in live mode; “Taylor Swift” resolved to the exact artist, and the strict Brooklyn locality filter returned three Brooklyn results. The public hosted browser flow returned live Qloo results.
+For a direct API request, send `POST /api/plan` with:
 
-## Public Demo Link
+```json
+{
+  "city": "Bengaluru",
+  "participants": [
+    { "name": "You", "favorites": ["Virat Kohli"] },
+    { "name": "Taylor", "favorites": ["Taylor Swift"] }
+  ]
+}
+```
 
-https://tastetrail-qloo-hackathon.vercel.app/ — public hosted demo; it reports live Qloo mode and returns recommendations.
+The hosted MCP endpoint is `https://tastetrail-qloo-hackathon.vercel.app/mcp` and the web demo is `https://tastetrail-qloo-hackathon.vercel.app/`.
 
-## Public Repository Link
+## Links
 
-https://github.com/doradlaharikrishna/tastetrail-qloo-hackathon — public GitHub repository. `.env` was excluded from the published files. The project includes an MIT `LICENSE` file.
+- Demo: https://tastetrail-qloo-hackathon.vercel.app/
+- Public source: https://github.com/doradlaharikrishna/tastetrail-qloo-hackathon
+- License: MIT
 
-## Demo Video
+## Submission form notes
 
-Not required by the Qloo Agentic Hackathon. Optional short outline: state the local-discovery problem; enter a city and cultural favorites; show the Qloo-powered trail; request another trail; briefly show the server-side Qloo integration and secret-handling approach.
-
-## Screenshot Shot List
-
-1. [Planner form](screenshots/planner-form.jpg).
-2. [First live Brooklyn trail](screenshots/live-brooklyn-trail.jpg).
-3. [Alternate live trail](screenshots/alternate-live-trail.jpg), returned after excluding the first set.
-
-These three screenshots were captured from the public hosted app and are included in the public repository. The event does not require a demo video.
-
-## Submission Readiness Notes
-
-- The local live API path and public hosted browser flow have both returned Qloo results.
-- The project has an MIT license and local run instructions.
-- The public source repository is available at https://github.com/doradlaharikrishna/tastetrail-qloo-hackathon.
-- Public demo: https://tastetrail-qloo-hackathon.vercel.app/.
-- A Devpost project exists as an unpublished `Untitled` pre-draft for this hackathon; it has no title, description, public slug, or submitted timestamp. TasteTrail has not been synced to it.
-- Required Devpost form fields include the project start date, public demo URL, and public repository URL. Confirm the exact start date before using it.
-- Qloo’s official requirements say a demo video is not required.
-
-## Known Limitations
-
-- The app currently presents Qloo results in a short itinerary format; it does not yet use an LLM or an autonomous multi-step agent framework.
-- The `occasion` choice is captured by the interface but is not currently used to alter the Qloo query.
-- The UI copy describes a concise three-stop outing, but the current result cards should be reviewed against live API data for useful names, addresses, and links.
-- The hosted app was verified with one city and one artist; more combinations and cities need review.
-- Qloo-ranked results can still vary in how directly they fit a night-out theme; the prototype displays Qloo's returned places without an additional editorial relevance filter.
-- Upload the three included screenshots to the Devpost project gallery if the form offers a gallery section.
-
-## TODO Official Form Fields
-
-- **When did you begin your project?** October 6, 2026 (confirmed by the participant).
-- **The public URL to your project:** https://tastetrail-qloo-hackathon.vercel.app/
-- **Link to your PUBLIC code repo:** https://github.com/doradlaharikrishna/tastetrail-qloo-hackathon
-- **Existing-project upgrade question:** Not applicable; TasteTrail was built for this Qloo hackathon.
+- Project start date: October 6, 2026.
+- Demo URL: https://tastetrail-qloo-hackathon.vercel.app/
+- Repository URL: https://github.com/doradlaharikrishna/tastetrail-qloo-hackathon
+- Demo video: the Qloo Agentic Hackathon does not require one.
