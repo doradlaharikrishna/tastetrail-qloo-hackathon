@@ -24,7 +24,7 @@ TasteTrail uses Qloo Taste AI through two live API stages: it resolves each supp
 
 ## How We Used Codex
 
-Codex helped create the responsive web interface, the Node.js server, and the server-side Qloo integration. It also helped prepare setup and usage documentation. A live API smoke check confirmed that search and Insights both returned HTTP 200; the Insights response contained 12 place results. A full browser-to-server interaction still needs a hosted or local end-to-end run.
+Codex helped create the responsive web interface, the Node.js server, the Vercel serverless endpoints, and the server-side Qloo integration. It also helped prepare setup and usage documentation. A live API check confirmed that search and Insights both returned HTTP 200; the Insights response contained 12 place results. A direct check of the Vercel-compatible endpoints returned three live places for the sample request. A full hosted browser run still needs verification.
 
 ## Key Features
 
@@ -51,15 +51,15 @@ Codex helped create the responsive web interface, the Node.js server, and the se
 4. Open the local app, enter a city and one or more specific favorites, and create a trail. Confirm that the app shows live Qloo results rather than the sample preview.
 5. Select “Try another trail” and confirm that a different result set is requested.
 
-Verified so far: JavaScript syntax and project JSON checks passed in an earlier build pass; a live API check using the configured key received HTTP 200 from Qloo Search and Insights, with 12 place results. The full browser flow and public deployment have not yet been verified.
+Verified so far: JavaScript syntax and project JSON checks pass; live API requests using the configured key received HTTP 200 from Qloo Search and Insights, with 12 place results. The Vercel-compatible health and trail handlers returned HTTP 200, with three live places in the trail response. The hosted browser flow has not yet been verified.
 
 ## Public Demo Link
 
-**TODO:** Add the externally hosted, publicly accessible app URL. The current app is a local build and does not meet the event’s published-demo requirement yet.
+**TODO:** Add the externally hosted, publicly accessible app URL. The GitHub source repo is public, but the demo is not deployed yet.
 
 ## Public Repository Link
 
-**TODO:** Add a public GitHub, GitLab, or Bitbucket repository URL. Before publishing, confirm `.env` and all credentials are excluded. The project includes an MIT `LICENSE` file.
+https://github.com/doradlaharikrishna/tastetrail-qloo-hackathon — public GitHub repository. `.env` was excluded from the published files. The project includes an MIT `LICENSE` file.
 
 ## Demo Video
 
@@ -77,9 +77,10 @@ No screenshots have been captured yet.
 
 ## Submission Readiness Notes
 
-- The live Qloo API path has passed a direct server-side smoke check.
+- The live Qloo API path has passed a direct server-side smoke check, including the Vercel-compatible endpoint.
 - The project has an MIT license and local run instructions.
-- The hackathon requires a functional, externally hosted demo and a public source repository. Both links remain TODO, so the project is not ready to submit.
+- The public source repository is available at https://github.com/doradlaharikrishna/tastetrail-qloo-hackathon.
+- The hackathon requires a functional, externally hosted demo; its public URL remains TODO, so the project is not ready to submit.
 - A Devpost project exists as an unpublished `Untitled` pre-draft for this hackathon; it has no title, description, public slug, or submitted timestamp. TasteTrail has not been synced to it.
 - Required Devpost form fields include the project start date, public demo URL, and public repository URL. Confirm the exact start date before using it.
 - Qloo’s official requirements say a demo video is not required.
@@ -89,12 +90,12 @@ No screenshots have been captured yet.
 - The app currently presents Qloo results in a short itinerary format; it does not yet use an LLM or an autonomous multi-step agent framework.
 - The `occasion` choice is captured by the interface but is not currently used to alter the Qloo query.
 - The UI copy describes a concise three-stop outing, but the current result cards should be reviewed against live API data for useful names, addresses, and links.
-- The app has not yet been run end-to-end through a browser against the local server, externally hosted, or tested across multiple cities and taste inputs.
-- No public repository, public demo URL, or screenshots are available yet.
+- The app has not yet been run end-to-end through a browser against a hosted deployment or tested across multiple cities and taste inputs.
+- No public demo URL or screenshots are available yet.
 
 ## TODO Official Form Fields
 
 - **When did you begin your project?** October 5, 2026 is the earliest recorded Devpost project-draft date; confirm the actual project start date before submission.
 - **The public URL to your project:** TODO — requires external hosting.
-- **Link to your PUBLIC code repo:** TODO — requires a public repository.
+- **Link to your PUBLIC code repo:** https://github.com/doradlaharikrishna/tastetrail-qloo-hackathon
 - **Existing-project upgrade question:** Not applicable; TasteTrail was built for this Qloo hackathon.

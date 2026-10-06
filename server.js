@@ -74,6 +74,7 @@ function publicPlace(entity) {
 }
 
 async function readJsonBody(request) {
+  if (request.body && typeof request.body === "object") return request.body;
   const chunks = [];
   let size = 0;
   for await (const chunk of request) {
@@ -181,7 +182,7 @@ async function liveTrail({ city, favorites, occasion, excludeIds }) {
   };
 }
 
-async function handleTrail(request, response) {
+export async function handleTrail(request, response) {
   if (isRateLimited(request)) return sendJson(response, 429, { error: "Please pause a moment before planning another trail." });
   try {
     const input = await readJsonBody(request);
@@ -261,6 +262,8 @@ const server = createServer(async (request, response) => {
   return serveStatic(url.pathname, response, request.method);
 });
 
-server.listen(port, "0.0.0.0", () => {
-  console.log(`TasteTrail ready on port ${port} (${qlooApiKey ? "Qloo API configured" : "preview mode"}).`);
-});
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  server.listen(port, "0.0.0.0", () => {
+    console.log(`TasteTrail ready on port ${port} (${qlooApiKey ? "Qloo API configured" : "preview mode"}).`);
+  });
+}
