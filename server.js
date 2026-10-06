@@ -248,7 +248,7 @@ async function serveStatic(pathname, response, method) {
   createReadStream(filePath).pipe(response);
 }
 
-const server = createServer(async (request, response) => {
+export default async function handler(request, response) {
   const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
   if (request.method === "GET" && url.pathname === "/api/health") {
     return sendJson(response, 200, { mode: qlooApiKey ? "live" : "preview" });
@@ -260,7 +260,9 @@ const server = createServer(async (request, response) => {
     return;
   }
   return serveStatic(url.pathname, response, request.method);
-});
+}
+
+const server = createServer(handler);
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   server.listen(port, "0.0.0.0", () => {
