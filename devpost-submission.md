@@ -10,9 +10,9 @@ Choosing where to go often means stitching together generic search results that 
 
 ## Solution
 
-TasteTrail is a small local-discovery planner. A person enters a city and up to four cultural favorites. The server resolves those favorites with Qloo Search, sends the matched entities and city to Qloo Insights, then presents a short list of recommended places. “Try another trail” excludes the previous results and requests another set.
+TasteTrail is a taste-aware local-discovery planner. A person enters a city and up to four cultural favorites. The server searches Qloo for matching artists, films, or places, selects the closest name match, sends those entity IDs and the city to Qloo Insights, and presents up to three recommended places. “Try another trail” excludes the previous results and requests another set.
 
-The Qloo taste graph is the core of the matching step: the app uses the returned place recommendations rather than generating recommendations from generic text. It is designed as a focused taste-aware planning tool that could also be called by a larger personal assistant.
+The recommendation workflow is exposed as a simple HTTP endpoint that another assistant can call: provide a city and cultural signals, and it resolves those signals before requesting Qloo-ranked places. The Qloo taste graph is the core of the matching step; the app uses returned place recommendations rather than inventing them with generic text.
 
 ## Why This Matters
 
@@ -24,12 +24,13 @@ TasteTrail uses Qloo Taste AI through two live API stages: it resolves each supp
 
 ## How We Used Codex
 
-Codex helped create the responsive web interface, the Node.js server, the Vercel serverless endpoints, and the server-side Qloo integration. It also helped prepare setup and usage documentation. A live API check confirmed that search and Insights both returned HTTP 200; the Insights response contained 12 place results. A direct check of the Vercel-compatible endpoints returned three live places for the sample request. A full hosted browser run still needs verification.
+Codex helped create the responsive web interface, the Node.js server, the server-side Qloo integration, deployment setup, and usage documentation. It checked the live Qloo search candidates, improved entity matching so an exact artist name outranks a longer venue name, and verified the local end-to-end API path. The public hosted app was also exercised in a browser and returned live Qloo results. The Qloo key remains a server-side environment variable.
 
 ## Key Features
 
 - Enter a city and up to four artists, films, or places as taste signals.
-- Resolve taste signals with Qloo Search and request city-specific place recommendations from Qloo Insights.
+- Resolve taste signals with Qloo Search, preferring the closest name match across artist, movie, and place entities.
+- Request city-specific place recommendations from Qloo Insights through a workflow callable by an assistant.
 - Show a concise three-stop trail with place details returned by Qloo.
 - Request a different trail while excluding previous results.
 - Keep the Qloo API key on the server in an ignored `.env` file; never send it to the browser.
@@ -51,11 +52,11 @@ Codex helped create the responsive web interface, the Node.js server, the Vercel
 4. Open the local app, enter a city and one or more specific favorites, and create a trail. Confirm that the app shows live Qloo results rather than the sample preview.
 5. Select “Try another trail” and confirm that a different result set is requested.
 
-Verified so far: JavaScript syntax and project JSON checks pass; live API requests using the configured key received HTTP 200 from Qloo Search and Insights, with 12 place results. The Vercel-compatible health and trail handlers returned HTTP 200, with three live places in the trail response. The hosted browser flow has not yet been verified.
+Verified so far: `node --check` passes for the server, browser script, and endpoint handlers. A local end-to-end request using the configured key returned HTTP 200 in live mode; the matched favorite was exactly “Taylor Swift” and Qloo returned three places. The public hosted browser flow returned live Qloo results.
 
 ## Public Demo Link
 
-**TODO:** Add the externally hosted, publicly accessible app URL. The GitHub source repo is public, but the demo is not deployed yet.
+https://tastetrail-qloo-hackathon.vercel.app/ — public hosted demo; it reports live Qloo mode and returns recommendations.
 
 ## Public Repository Link
 
@@ -73,14 +74,14 @@ Not required by the Qloo Agentic Hackathon. Optional short outline: state the lo
 4. A second trail after requesting another set.
 5. The preview-mode label, if demonstrating the no-key fallback.
 
-No screenshots have been captured yet.
+The live hosted browser run was captured during verification. Before final Devpost entry, save or attach 3–5 gallery screenshots: the planner inputs, populated favorites, first live trail, and a second trail after excluding the first set.
 
 ## Submission Readiness Notes
 
-- The live Qloo API path has passed a direct server-side smoke check, including the Vercel-compatible endpoint.
+- The local live API path and public hosted browser flow have both returned Qloo results.
 - The project has an MIT license and local run instructions.
 - The public source repository is available at https://github.com/doradlaharikrishna/tastetrail-qloo-hackathon.
-- The hackathon requires a functional, externally hosted demo; its public URL remains TODO, so the project is not ready to submit.
+- Public demo: https://tastetrail-qloo-hackathon.vercel.app/.
 - A Devpost project exists as an unpublished `Untitled` pre-draft for this hackathon; it has no title, description, public slug, or submitted timestamp. TasteTrail has not been synced to it.
 - Required Devpost form fields include the project start date, public demo URL, and public repository URL. Confirm the exact start date before using it.
 - Qloo’s official requirements say a demo video is not required.
@@ -90,12 +91,12 @@ No screenshots have been captured yet.
 - The app currently presents Qloo results in a short itinerary format; it does not yet use an LLM or an autonomous multi-step agent framework.
 - The `occasion` choice is captured by the interface but is not currently used to alter the Qloo query.
 - The UI copy describes a concise three-stop outing, but the current result cards should be reviewed against live API data for useful names, addresses, and links.
-- The app has not yet been run end-to-end through a browser against a hosted deployment or tested across multiple cities and taste inputs.
-- No public demo URL or screenshots are available yet.
+- The hosted app was verified with one city and one artist; more combinations and cities need review.
+- Capture and attach project gallery screenshots in Devpost.
 
 ## TODO Official Form Fields
 
 - **When did you begin your project?** October 5, 2026 is the earliest recorded Devpost project-draft date; confirm the actual project start date before submission.
-- **The public URL to your project:** TODO — requires external hosting.
+- **The public URL to your project:** https://tastetrail-qloo-hackathon.vercel.app/
 - **Link to your PUBLIC code repo:** https://github.com/doradlaharikrishna/tastetrail-qloo-hackathon
 - **Existing-project upgrade question:** Not applicable; TasteTrail was built for this Qloo hackathon.

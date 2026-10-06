@@ -4,9 +4,9 @@ TasteTrail is a taste-aware local discovery agent for the Qloo Agentic Hackathon
 
 ## Current status
 
-This prototype includes a dependency-free local Node server, Vercel serverless endpoints, and a preview mode with clearly labeled sample recommendations. When `QLOO_API_KEY` is set on the server, TasteTrail uses the Qloo Hackathon API. The API key is never sent to browser code.
+The app includes a dependency-free Node server, a container deployment for Vercel, a public hosted demo, and a sample preview mode. When `QLOO_API_KEY` is set on the server, TasteTrail uses the Qloo Hackathon API. The API key is never sent to browser code.
 
-Never put the Qloo API key in browser JavaScript or commit it to this public repository. Keep it in a server-side environment variable when the API integration and hosting are configured.
+Never put the Qloo API key in browser JavaScript or commit it to this public repository. Keep it in a server-side environment variable.
 
 ## Run locally
 
@@ -26,9 +26,9 @@ The production deployment runs the Node server in `Dockerfile.vercel`; it serves
 
 ## Before hackathon submission
 
-- Deploy a public, working demo that judges can use without private access.
-- Run a live Qloo request with the hackathon key and confirm the API's returned fields in the demo.
-- Public source: https://github.com/doradlaharikrishna/tastetrail-qloo-hackathon. Verify the MIT license is visible in the repository's About section.
+- Public demo: https://tastetrail-qloo-hackathon.vercel.app/
+- Public source: https://github.com/doradlaharikrishna/tastetrail-qloo-hackathon (MIT license).
+- For local verification, run `npm start`, open `http://localhost:3000`, enter a city and one or more favorites, and create a trail. The hosted demo is configured for live Qloo results.
 - Confirm the recommendations, project description, and testing instructions match the working app.
 
 ## License

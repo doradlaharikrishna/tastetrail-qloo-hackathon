@@ -126,22 +126,39 @@ async function qlooRequest(path, options = {}) {
 }
 
 async function lookupFavorite(query) {
+  const normalize = (value) => value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  const normalizedQuery = normalize(query);
+  const queryTokens = new Set(normalizedQuery.split(" ").filter(Boolean));
+  const typePriority = new Map([["urn:entity:place", 0], ["urn:entity:artist", 1], ["urn:entity:movie", 2]]);
   const attempts = entityTypes.map(async (type) => {
     const search = new URLSearchParams({ query, type });
     try {
       const payload = await qlooRequest(`/search?${search}`);
-      const match = resultEntities(payload).find((entity) => entityId(entity));
-      return match ? { id: entityId(match), name: match.name || query, type } : null;
+      return resultEntities(payload)
+        .filter((entity) => entityId(entity) && entity.name)
+        .map((entity) => {
+          const name = normalize(entity.name);
+          const tokens = new Set(name.split(" ").filter(Boolean));
+          const overlap = [...queryTokens].filter((token) => tokens.has(token)).length;
+          let score = queryTokens.size ? (overlap / queryTokens.size) * 40 : 0;
+          if (name === normalizedQuery) score = 100;
+          else if (name.startsWith(`${normalizedQuery} `)) score = Math.max(score, 65);
+          else if (normalizedQuery.startsWith(`${name} `)) score = Math.max(score, 55);
+          return { id: entityId(entity), name: entity.name, type, score };
+        });
     } catch (error) {
       if ([401, 403, 404, 429].includes(error.upstreamStatus) || error.upstreamStatus >= 500) throw error;
-      return null;
+      return [];
     }
   });
-  const matches = (await Promise.all(attempts)).filter(Boolean);
+  const matches = (await Promise.all(attempts)).flat().filter((match) => match.score > 0);
   if (!matches.length) return null;
-  return matches.find((match) => match.type === "urn:entity:place")
-    || matches.find((match) => match.type === "urn:entity:artist")
-    || matches[0];
+  return matches.sort((left, right) => right.score - left.score || typePriority.get(left.type) - typePriority.get(right.type))[0];
 }
 
 async function liveTrail({ city, favorites, occasion, excludeIds }) {
