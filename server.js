@@ -145,25 +145,47 @@ async function searchCitySuggestions(query) {
   const cached = citySuggestionCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.cities;
 
-  const search = new URLSearchParams({ query, type: "urn:entity:locality" });
-  const payload = await qlooRequest(`/search?${search}`);
+  const entityTypes = ["urn:entity:locality", "urn:entity:place"];
+  const groups = await Promise.all(entityTypes.map(async (type) => {
+    const search = new URLSearchParams({ query, type });
+    try {
+      const payload = await qlooRequest(`/search?${search}`);
+      return resultEntities(payload).map((entity) => ({ entity, type }));
+    } catch {
+      return [];
+    }
+  }));
+  const normalizedQuery = query.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase().trim();
   const seen = new Set();
-  const cities = resultEntities(payload)
-    .map((entity) => {
+  const matches = groups.flat()
+    .map(({ entity, type }) => {
       const name = cleanText(entity?.name, 100);
       const disambiguation = cleanText(entity?.disambiguation, 180);
-      const value = disambiguation || name;
-      const details = disambiguation.startsWith(`${name},`)
+      const isPlace = type === "urn:entity:place";
+      const value = isPlace && disambiguation ? `${name}, ${disambiguation}` : disambiguation || name;
+      const details = !isPlace && disambiguation.startsWith(`${name},`)
         ? disambiguation.slice(name.length + 1).trim()
         : disambiguation;
-      return { name, details, value };
+      const normalizedName = name.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase();
+      const score = normalizedName === normalizedQuery
+        ? 100
+        : normalizedName.startsWith(normalizedQuery)
+          ? 80
+          : normalizedName.includes(normalizedQuery)
+            ? 50
+            : 0;
+      return { name, details, value, score, isPlace };
     })
     .filter((city) => {
       if (!city.name || !city.value || seen.has(city.value.toLocaleLowerCase())) return false;
       seen.add(city.value.toLocaleLowerCase());
       return true;
     })
-    .slice(0, 6);
+    .sort((left, right) => right.score - left.score || Number(left.isPlace) - Number(right.isPlace));
+  const relevantMatches = matches.some((city) => city.score > 0)
+    ? matches.filter((city) => city.score > 0)
+    : matches;
+  const cities = relevantMatches.slice(0, 6).map(({ name, details, value }) => ({ name, details, value }));
 
   citySuggestionCache.set(cacheKey, { cities, expiresAt: Date.now() + 5 * 60 * 1000 });
   if (citySuggestionCache.size > 100) citySuggestionCache.delete(citySuggestionCache.keys().next().value);
