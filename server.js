@@ -14,7 +14,7 @@ const rateLimit = 18;
 const requestsByIp = new Map();
 const citySearchesByIp = new Map();
 const citySuggestionCache = new Map();
-const entityTypes = ["urn:entity:artist", "urn:entity:movie", "urn:entity:place"];
+const entityTypes = ["urn:entity:person", "urn:entity:artist", "urn:entity:movie", "urn:entity:place"];
 const sampleStops = [
   { title: "The candlelit table", meta: "Dinner · Japanese comfort food", reason: "A familiar favorite, with a menu that leaves room to explore." },
   { title: "A listening room", meta: "Music · Live jazz", reason: "For the part of your taste that likes to slow down and listen." },
@@ -57,7 +57,7 @@ function entityId(entity) {
   return entity?.entity_id || entity?.id || entity?.entity?.entity_id || entity?.entity?.id || "";
 }
 
-function publicPlace(entity) {
+function publicPlace(entity, { matchedFavorites, occasion }) {
   const properties = entity?.properties || {};
   const geocode = properties.geocode || {};
   const address = properties.address || {};
@@ -67,13 +67,34 @@ function publicPlace(entity) {
   const site = properties.website || properties.url || entity?.url || "";
   const rawKind = entity?.subtype || entity?.type || "place";
   const kind = rawKind.replace(/^urn:entity:/, "").replace(/[_-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+  const signalNames = new Map(matchedFavorites.map((favorite) => [favorite.id, favorite.name]));
+  const explainedSignals = entity?.query?.explainability?.["signal.interests.entities"] || [];
+  const tasteMatch = explainedSignals
+    .filter((signal) => signal.score >= 0.1 && signalNames.has(signal.entity_id))
+    .sort((left, right) => right.score - left.score)[0];
+  const affinity = Number(entity?.query?.affinity);
+  const usefulTags = (entity?.tags || [])
+    .filter((tag) => /^(urn:tag:(ambience|decor|interests|time_of_day_fit|menu_highlight|cuisine):)/.test(tag.type || ""))
+    .map((tag) => cleanText(tag.name, 60))
+    .filter(Boolean)
+    .slice(0, 2);
+  const reasons = [];
+  if (occasion === "Dinner and a good conversation") reasons.push("Restaurant match for dinner");
+  if (tasteMatch) {
+    reasons.push(Number.isFinite(affinity)
+      ? `Qloo affinity ${affinity.toFixed(2)} for ${signalNames.get(tasteMatch.entity_id)}`
+      : `Taste connection: ${signalNames.get(tasteMatch.entity_id)}`);
+  } else if (Number.isFinite(affinity)) {
+    reasons.push(`Qloo affinity ${affinity.toFixed(2)}`);
+  }
+  if (usefulTags.length) reasons.push(`Qloo tags: ${usefulTags.join(", ")}`);
   return {
     id: entityId(entity),
     name: entity?.name || properties.name || "A local favorite",
-    kind,
+    kind: occasion === "Dinner and a good conversation" ? "Restaurant" : kind,
     location: addressText || [geocode.name, geocode.city].filter(Boolean).join(", "),
     url: typeof site === "string" && /^https?:\/\//i.test(site) ? site : "",
-    reason: "Qloo ranked this place using your selected taste signals and location."
+    reason: reasons.join(" · ")
   };
 }
 
@@ -201,7 +222,7 @@ async function lookupFavorite(query) {
     .trim();
   const normalizedQuery = normalize(query);
   const queryTokens = new Set(normalizedQuery.split(" ").filter(Boolean));
-  const typePriority = new Map([["urn:entity:place", 0], ["urn:entity:artist", 1], ["urn:entity:movie", 2]]);
+  const typePriority = new Map([["urn:entity:person", 0], ["urn:entity:artist", 1], ["urn:entity:movie", 2], ["urn:entity:place", 3]]);
   const attempts = entityTypes.map(async (type) => {
     const search = new URLSearchParams({ query, type });
     try {
@@ -212,10 +233,12 @@ async function lookupFavorite(query) {
           const name = normalize(entity.name);
           const tokens = new Set(name.split(" ").filter(Boolean));
           const overlap = [...queryTokens].filter((token) => tokens.has(token)).length;
-          let score = queryTokens.size ? (overlap / queryTokens.size) * 40 : 0;
-          if (name === normalizedQuery) score = 100;
-          else if (name.startsWith(`${normalizedQuery} `)) score = Math.max(score, 65);
-          else if (normalizedQuery.startsWith(`${name} `)) score = Math.max(score, 55);
+          const isSingleTokenPlaceExact = type === "urn:entity:place" && queryTokens.size === 1 && name === normalizedQuery;
+          const score = name === normalizedQuery && !isSingleTokenPlaceExact
+            ? 100
+            : queryTokens.size && overlap === queryTokens.size
+              ? 60
+              : 0;
           return { id: entityId(entity), name: entity.name, type, score };
         });
     } catch (error) {
@@ -246,6 +269,9 @@ async function liveTrail({ city, favorites, occasion, excludeIds }) {
     "take": 12,
     "feature.explainability": true
   };
+  if (occasion === "Dinner and a good conversation") {
+    body["filter.tags"] = "urn:tag:category:place:restaurant";
+  }
   if (excludeIds.length) body["filter.exclude.entities"] = excludeIds.join(",");
 
   const insight = await qlooRequest("/v2/insights", {
@@ -253,7 +279,9 @@ async function liveTrail({ city, favorites, occasion, excludeIds }) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body)
   });
-  const places = resultEntities(insight).map(publicPlace).filter((place) => place.id && place.name);
+  const places = resultEntities(insight)
+    .map((entity) => publicPlace(entity, { matchedFavorites: resolved, occasion }))
+    .filter((place) => place.id && place.name);
   if (!places.length) {
     throw Object.assign(new Error("Qloo returned no places for that combination. Try another city or preference."), { status: 404 });
   }
