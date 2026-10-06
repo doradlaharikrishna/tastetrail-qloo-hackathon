@@ -1,5 +1,6 @@
 const form = document.querySelector("#planner-form");
 const cityInput = document.querySelector("#city");
+const citySuggestions = document.querySelector("#city-suggestions");
 const favoritesInput = document.querySelector("#favorites");
 const occasionInput = document.querySelector("#occasion");
 const recommendations = document.querySelector("#recommendations");
@@ -13,6 +14,99 @@ const refreshButton = document.querySelector("#refresh-button");
 let toastTimer;
 let lastRequest = null;
 let lastTrail = null;
+let citySearchTimer;
+let citySearchController;
+let activeCitySuggestion = -1;
+
+function closeCitySuggestions() {
+  citySuggestions.hidden = true;
+  citySuggestions.replaceChildren();
+  cityInput.setAttribute("aria-expanded", "false");
+  cityInput.removeAttribute("aria-activedescendant");
+  activeCitySuggestion = -1;
+}
+
+function setActiveCitySuggestion(index) {
+  const options = [...citySuggestions.querySelectorAll('[role="option"]')];
+  if (!options.length) return;
+  activeCitySuggestion = (index + options.length) % options.length;
+  options.forEach((option, optionIndex) => {
+    const active = optionIndex === activeCitySuggestion;
+    option.setAttribute("aria-selected", String(active));
+    option.classList.toggle("active", active);
+  });
+  cityInput.setAttribute("aria-activedescendant", options[activeCitySuggestion].id);
+  options[activeCitySuggestion].scrollIntoView({ block: "nearest" });
+}
+
+function chooseCitySuggestion(city) {
+  cityInput.value = city.value;
+  closeCitySuggestions();
+}
+
+function renderCitySuggestions(cities) {
+  if (!cities.length) {
+    closeCitySuggestions();
+    return;
+  }
+  citySuggestions.innerHTML = cities.map((city, index) => `
+    <button class="city-suggestion" id="city-option-${index}" type="button" role="option" aria-selected="false" data-city-value="${escapeHtml(city.value)}">
+      <span class="city-suggestion-name">${escapeHtml(city.name)}</span>
+      ${city.details ? `<span class="city-suggestion-details">${escapeHtml(city.details)}</span>` : ""}
+    </button>
+  `).join("");
+  citySuggestions.hidden = false;
+  cityInput.setAttribute("aria-expanded", "true");
+  activeCitySuggestion = -1;
+}
+
+cityInput.addEventListener("input", () => {
+  window.clearTimeout(citySearchTimer);
+  citySearchController?.abort();
+  closeCitySuggestions();
+  const query = cityInput.value.trim();
+  if (query.length < 2) return;
+
+  citySearchTimer = window.setTimeout(async () => {
+    const controller = new AbortController();
+    citySearchController = controller;
+    try {
+      const response = await fetch(`/api/cities?q=${encodeURIComponent(query)}`, { signal: controller.signal });
+      if (!response.ok) return;
+      const { cities } = await response.json();
+      if (!controller.signal.aborted && cityInput.value.trim() === query) renderCitySuggestions(cities || []);
+    } catch (error) {
+      if (error.name !== "AbortError") closeCitySuggestions();
+    }
+  }, 300);
+});
+
+cityInput.addEventListener("keydown", (event) => {
+  if (citySuggestions.hidden) return;
+  const options = citySuggestions.querySelectorAll('[role="option"]');
+  if (event.key === "ArrowDown" && options.length) {
+    event.preventDefault();
+    setActiveCitySuggestion(activeCitySuggestion + 1);
+  } else if (event.key === "ArrowUp" && options.length) {
+    event.preventDefault();
+    setActiveCitySuggestion(activeCitySuggestion < 0 ? options.length - 1 : activeCitySuggestion - 1);
+  } else if (event.key === "Enter" && activeCitySuggestion >= 0) {
+    event.preventDefault();
+    chooseCitySuggestion({ value: options[activeCitySuggestion].dataset.cityValue });
+  } else if (event.key === "Escape") {
+    closeCitySuggestions();
+  }
+});
+
+citySuggestions.addEventListener("mousedown", (event) => event.preventDefault());
+citySuggestions.addEventListener("click", (event) => {
+  const option = event.target.closest('[role="option"]');
+  if (option) chooseCitySuggestion({ value: option.dataset.cityValue });
+});
+
+document.addEventListener("click", (event) => {
+  if (!event.target.closest(".city-control")) closeCitySuggestions();
+});
 
 function escapeHtml(value) {
   return value.replace(/[&<>"']/g, (character) => ({

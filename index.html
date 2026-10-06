@@ -43,10 +43,13 @@
 
           <form id="planner-form">
             <div class="form-grid">
-              <label class="field">
-                <span class="field-label">Where are you going?</span>
-                <span class="input-wrap"><span class="field-icon" aria-hidden="true">⌖</span><input id="city" name="city" value="Brooklyn, NY" autocomplete="address-level2" required /></span>
-              </label>
+              <div class="field city-field">
+                <label class="field-label" for="city">Where are you going?</label>
+                <div class="city-control">
+                  <span class="input-wrap"><span class="field-icon" aria-hidden="true">⌖</span><input id="city" name="city" value="Brooklyn, NY" autocomplete="off" role="combobox" aria-autocomplete="list" aria-haspopup="listbox" aria-controls="city-suggestions" aria-expanded="false" required /></span>
+                  <div class="city-suggestions" id="city-suggestions" role="listbox" aria-label="City suggestions" hidden></div>
+                </div>
+              </div>
               <label class="field">
                 <span class="field-label">What kind of night?</span>
                 <span class="select-wrap"><span class="field-icon" aria-hidden="true">✳</span><select id="occasion" name="occasion"><option value="A little of everything">A little of everything</option><option value="Dinner and a good conversation">Dinner and a good conversation</option><option value="Something unexpected">Something unexpected</option><option value="A cozy night out">A cozy night out</option></select><span class="chevron">⌄</span></span>

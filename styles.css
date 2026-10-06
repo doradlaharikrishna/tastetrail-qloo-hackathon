@@ -52,11 +52,19 @@ h2 { margin-bottom: 0; font: 600 25px/1.2 "Playfair Display", Georgia, serif; le
 .field { display: block; min-width: 0; }
 .field-label { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; color: #42473f; font-size: 12px; font-weight: 600; }
 .optional { color: #aaa99e; font-size: 8px; letter-spacing: .11em; }
+.city-field { position: relative; z-index: 2; }
+.city-control { position: relative; }
 .input-wrap, .select-wrap { display: flex; align-items: center; height: 46px; border: 1px solid #e7e3da; border-radius: 8px; background: #fff; transition: border-color .18s, box-shadow .18s; }
 .input-wrap:focus-within, .select-wrap:focus-within { border-color: #879884; box-shadow: 0 0 0 3px rgba(135, 152, 132, .13); }
 .field-icon { flex: 0 0 auto; margin: 0 11px 0 13px; color: #778472; font-size: 18px; line-height: 1; }
 .input-wrap input, .select-wrap select { width: 100%; height: 100%; padding: 0 12px 0 0; border: 0; outline: 0; color: #42473f; background: transparent; font-size: 12px; }
 .input-wrap input::placeholder { color: #a7a89f; }
+.city-suggestions { position: absolute; top: calc(100% + 7px); right: 0; left: 0; z-index: 5; max-height: 240px; overflow-y: auto; padding: 5px; border: 1px solid #e5e1d8; border-radius: 10px; background: #fff; box-shadow: 0 12px 28px rgba(37, 40, 32, .13); }
+.city-suggestions[hidden] { display: none; }
+.city-suggestion { display: flex; width: 100%; flex-direction: column; gap: 3px; padding: 10px 11px; border: 0; border-radius: 7px; color: #42473f; background: transparent; text-align: left; }
+.city-suggestion:hover, .city-suggestion[aria-selected="true"] { background: #f0f3ec; }
+.city-suggestion-name { font-size: 12px; font-weight: 600; }
+.city-suggestion-details { color: #85877d; font-size: 10px; }
 .select-wrap select { appearance: none; padding-right: 3px; cursor: pointer; }
 .chevron { margin: 0 13px; color: #828578; font-size: 17px; pointer-events: none; }
 .taste-field { margin-top: 21px; }

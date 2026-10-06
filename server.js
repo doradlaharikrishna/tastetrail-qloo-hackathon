@@ -12,6 +12,8 @@ const maxBodyBytes = 4096;
 const rateWindowMs = 10 * 60 * 1000;
 const rateLimit = 18;
 const requestsByIp = new Map();
+const citySearchesByIp = new Map();
+const citySuggestionCache = new Map();
 const entityTypes = ["urn:entity:artist", "urn:entity:movie", "urn:entity:place"];
 const sampleStops = [
   { title: "The candlelit table", meta: "Dinner · Japanese comfort food", reason: "A familiar favorite, with a menu that leaves room to explore." },
@@ -102,6 +104,17 @@ function isRateLimited(request) {
   return recent.length > rateLimit;
 }
 
+function isCitySearchRateLimited(request) {
+  const now = Date.now();
+  const forwardedFor = request.headers["x-forwarded-for"]?.split(",")[0]?.trim();
+  const ip = forwardedFor || request.socket.remoteAddress || "unknown";
+  const previous = citySearchesByIp.get(ip) || [];
+  const recent = previous.filter((timestamp) => now - timestamp < rateWindowMs);
+  recent.push(now);
+  citySearchesByIp.set(ip, recent);
+  return recent.length > 60;
+}
+
 async function qlooRequest(path, options = {}) {
   const response = await fetch(`${qlooBaseUrl}${path}`, {
     ...options,
@@ -125,6 +138,36 @@ async function qlooRequest(path, options = {}) {
     });
   }
   return data;
+}
+
+async function searchCitySuggestions(query) {
+  const cacheKey = query.toLocaleLowerCase();
+  const cached = citySuggestionCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.cities;
+
+  const search = new URLSearchParams({ query, type: "urn:entity:locality" });
+  const payload = await qlooRequest(`/search?${search}`);
+  const seen = new Set();
+  const cities = resultEntities(payload)
+    .map((entity) => {
+      const name = cleanText(entity?.name, 100);
+      const disambiguation = cleanText(entity?.disambiguation, 180);
+      const value = disambiguation || name;
+      const details = disambiguation.startsWith(`${name},`)
+        ? disambiguation.slice(name.length + 1).trim()
+        : disambiguation;
+      return { name, details, value };
+    })
+    .filter((city) => {
+      if (!city.name || !city.value || seen.has(city.value.toLocaleLowerCase())) return false;
+      seen.add(city.value.toLocaleLowerCase());
+      return true;
+    })
+    .slice(0, 6);
+
+  citySuggestionCache.set(cacheKey, { cities, expiresAt: Date.now() + 5 * 60 * 1000 });
+  if (citySuggestionCache.size > 100) citySuggestionCache.delete(citySuggestionCache.keys().next().value);
+  return cities;
 }
 
 async function lookupFavorite(query) {
@@ -272,6 +315,16 @@ export default async function handler(request, response) {
   const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
   if (request.method === "GET" && url.pathname === "/api/health") {
     return sendJson(response, 200, { mode: qlooApiKey ? "live" : "preview" });
+  }
+  if (request.method === "GET" && url.pathname === "/api/cities") {
+    const query = cleanText(url.searchParams.get("q"), 80);
+    if (query.length < 2 || !qlooApiKey) return sendJson(response, 200, { cities: [] });
+    if (isCitySearchRateLimited(request)) return sendJson(response, 429, { cities: [] });
+    try {
+      return sendJson(response, 200, { cities: await searchCitySuggestions(query) });
+    } catch {
+      return sendJson(response, 200, { cities: [] });
+    }
   }
   if (request.method === "POST" && url.pathname === "/api/trail") return handleTrail(request, response);
   if (url.pathname.startsWith("/api/")) return sendJson(response, 404, { error: "Not found." });
