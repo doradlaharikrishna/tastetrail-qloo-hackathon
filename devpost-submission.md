@@ -68,13 +68,11 @@ Not required by the Qloo Agentic Hackathon. Optional short outline: state the lo
 
 ## Screenshot Shot List
 
-1. The empty planner form with city and taste inputs.
-2. A populated form showing the selected city and favorites.
-3. Live Qloo results showing the three-stop trail and its place details.
-4. A second trail after requesting another set.
-5. The preview-mode label, if demonstrating the no-key fallback.
+1. [Planner form](screenshots/planner-form.jpg).
+2. [First live Brooklyn trail](screenshots/live-brooklyn-trail.jpg).
+3. [Alternate live trail](screenshots/alternate-live-trail.jpg), returned after excluding the first set.
 
-The live hosted browser run was captured during verification. Before final Devpost entry, save or attach 3–5 gallery screenshots: the planner inputs, populated favorites, first live trail, and a second trail after excluding the first set.
+These three screenshots were captured from the public hosted app and are included in the public repository. The event does not require a demo video.
 
 ## Submission Readiness Notes
 
@@ -93,7 +91,7 @@ The live hosted browser run was captured during verification. Before final Devpo
 - The UI copy describes a concise three-stop outing, but the current result cards should be reviewed against live API data for useful names, addresses, and links.
 - The hosted app was verified with one city and one artist; more combinations and cities need review.
 - Qloo-ranked results can still vary in how directly they fit a night-out theme; the prototype displays Qloo's returned places without an additional editorial relevance filter.
-- Capture and attach project gallery screenshots in Devpost.
+- Upload the three included screenshots to the Devpost project gallery if the form offers a gallery section.
 
 ## TODO Official Form Fields
 

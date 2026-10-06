@@ -37,6 +37,12 @@ The production deployment runs the Node server in `Dockerfile.vercel`; it serves
 
 The endpoint returns JSON containing `mode`, `matchedFavorites`, `city`, and `places`. The server keeps the Qloo API key private; callers do not need to send a key.
 
+## Screenshots
+
+- [Planner form](screenshots/planner-form.jpg)
+- [Live Brooklyn trail](screenshots/live-brooklyn-trail.jpg)
+- [Alternate live trail](screenshots/alternate-live-trail.jpg)
+
 ## Before hackathon submission
 
 - Public demo: https://tastetrail-qloo-hackathon.vercel.app/
