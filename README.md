@@ -22,7 +22,7 @@ Then open `http://localhost:3000`. `.env` is git-ignored and hidden files are no
 
 ## Vercel deployment
 
-The files in `api/` provide the live trail and health endpoints for Vercel. Link this repository to a Vercel project and add `QLOO_API_KEY` as a sensitive environment variable for production, preview, and development. Never add the key to source control.
+The production deployment runs the Node server in `Dockerfile.vercel`; it serves the interface and the live trail endpoint. The `api/` folder also contains Vercel function handlers. `QLOO_API_KEY` is stored as a sensitive Vercel environment variable. Never add the key to source control.
 
 ## Before hackathon submission
 
