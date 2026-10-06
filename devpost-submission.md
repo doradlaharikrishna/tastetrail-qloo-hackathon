@@ -95,7 +95,7 @@ These three screenshots were captured from the public hosted app and are include
 
 ## TODO Official Form Fields
 
-- **When did you begin your project?** October 5, 2026 is the earliest recorded Devpost project-draft date; confirm the actual project start date before submission.
+- **When did you begin your project?** October 6, 2026 (confirmed by the participant).
 - **The public URL to your project:** https://tastetrail-qloo-hackathon.vercel.app/
 - **Link to your PUBLIC code repo:** https://github.com/doradlaharikrishna/tastetrail-qloo-hackathon
 - **Existing-project upgrade question:** Not applicable; TasteTrail was built for this Qloo hackathon.
