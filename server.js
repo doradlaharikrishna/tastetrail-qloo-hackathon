@@ -63,10 +63,12 @@ function publicPlace(entity) {
     ? address
     : [address.street, address.locality, address.region, address.postal_code].filter(Boolean).join(", ");
   const site = properties.website || properties.url || entity?.url || "";
+  const rawKind = entity?.subtype || entity?.type || "place";
+  const kind = rawKind.replace(/^urn:entity:/, "").replace(/[_-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
   return {
     id: entityId(entity),
     name: entity?.name || properties.name || "A local favorite",
-    kind: entity?.subtype || entity?.type?.replace("urn:entity:", "") || "Place",
+    kind,
     location: addressText || [geocode.name, geocode.city].filter(Boolean).join(", "),
     url: typeof site === "string" && /^https?:\/\//i.test(site) ? site : "",
     reason: "Qloo ranked this place using your selected taste signals and location."
@@ -175,6 +177,7 @@ async function liveTrail({ city, favorites, occasion, excludeIds }) {
     "filter.type": "urn:entity:place",
     "signal.interests.entities": resolved.map((entity) => entity.id),
     "filter.location.query": city,
+    "filter.location.radius": 0,
     "take": 12,
     "feature.explainability": true
   };

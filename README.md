@@ -24,6 +24,19 @@ Then open `http://localhost:3000`. `.env` is git-ignored and hidden files are no
 
 The production deployment runs the Node server in `Dockerfile.vercel`; it serves the interface and the live trail endpoint. The `api/` folder also contains Vercel function handlers. `QLOO_API_KEY` is stored as a sensitive Vercel environment variable. Never add the key to source control.
 
+## Callable planning tool
+
+`POST https://tastetrail-qloo-hackathon.vercel.app/api/trail` accepts a city and one or more cultural favorites. It resolves each favorite with Qloo Search, then calls Qloo Insights with strict locality filtering and returns up to three place results. This endpoint is the agent-callable planning step; this prototype does not include an LLM or claim autonomous conversation.
+
+```json
+{
+  "city": "Brooklyn, NY",
+  "favorites": ["Taylor Swift"]
+}
+```
+
+The endpoint returns JSON containing `mode`, `matchedFavorites`, `city`, and `places`. The server keeps the Qloo API key private; callers do not need to send a key.
+
 ## Before hackathon submission
 
 - Public demo: https://tastetrail-qloo-hackathon.vercel.app/

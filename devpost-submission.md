@@ -10,7 +10,7 @@ Choosing where to go often means stitching together generic search results that 
 
 ## Solution
 
-TasteTrail is a taste-aware local-discovery planner. A person enters a city and up to four cultural favorites. The server searches Qloo for matching artists, films, or places, selects the closest name match, sends those entity IDs and the city to Qloo Insights, and presents up to three recommended places. “Try another trail” excludes the previous results and requests another set.
+TasteTrail is a taste-aware local-discovery planner. A person enters a city and up to four cultural favorites. The server searches Qloo for matching artists, films, or places, selects the closest name match, sends those entity IDs and the city to Qloo Insights with strict locality filtering, and presents up to three recommended places. “Try another trail” excludes the previous results and requests another set.
 
 The recommendation workflow is exposed as a simple HTTP endpoint that another assistant can call: provide a city and cultural signals, and it resolves those signals before requesting Qloo-ranked places. The Qloo taste graph is the core of the matching step; the app uses returned place recommendations rather than inventing them with generic text.
 
@@ -30,7 +30,7 @@ Codex helped create the responsive web interface, the Node.js server, the server
 
 - Enter a city and up to four artists, films, or places as taste signals.
 - Resolve taste signals with Qloo Search, preferring the closest name match across artist, movie, and place entities.
-- Request city-specific place recommendations from Qloo Insights through a workflow callable by an assistant.
+- Request strictly city-bounded place recommendations from Qloo Insights through a workflow callable by an assistant.
 - Show a concise three-stop trail with place details returned by Qloo.
 - Request a different trail while excluding previous results.
 - Keep the Qloo API key on the server in an ignored `.env` file; never send it to the browser.
@@ -52,7 +52,7 @@ Codex helped create the responsive web interface, the Node.js server, the server
 4. Open the local app, enter a city and one or more specific favorites, and create a trail. Confirm that the app shows live Qloo results rather than the sample preview.
 5. Select “Try another trail” and confirm that a different result set is requested.
 
-Verified so far: `node --check` passes for the server, browser script, and endpoint handlers. A local end-to-end request using the configured key returned HTTP 200 in live mode; the matched favorite was exactly “Taylor Swift” and Qloo returned three places. The public hosted browser flow returned live Qloo results.
+Verified so far: `node --check` passes for the server, browser script, and endpoint handlers. A local end-to-end request using the configured key returned HTTP 200 in live mode; “Taylor Swift” resolved to the exact artist, and the strict Brooklyn locality filter returned three Brooklyn results. The public hosted browser flow returned live Qloo results.
 
 ## Public Demo Link
 
@@ -92,6 +92,7 @@ The live hosted browser run was captured during verification. Before final Devpo
 - The `occasion` choice is captured by the interface but is not currently used to alter the Qloo query.
 - The UI copy describes a concise three-stop outing, but the current result cards should be reviewed against live API data for useful names, addresses, and links.
 - The hosted app was verified with one city and one artist; more combinations and cities need review.
+- Qloo-ranked results can still vary in how directly they fit a night-out theme; the prototype displays Qloo's returned places without an additional editorial relevance filter.
 - Capture and attach project gallery screenshots in Devpost.
 
 ## TODO Official Form Fields
