@@ -210,7 +210,12 @@ async function requestPlan(request, excludeIds = []) {
   try {
     const response = await fetch("/api/plan", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...request, excludeIds }) });
     const plan = await response.json();
-    if (!response.ok) throw new Error(plan.error || "The shared lunch planner couldn’t finish that request.");
+    if (!response.ok) {
+      const retryHint = Number.isFinite(plan.retryAfterSeconds) && plan.retryAfterSeconds > 0
+        ? ` Please try again in about ${plan.retryAfterSeconds} seconds.`
+        : "";
+      throw new Error(`${plan.error || "The shared lunch planner couldn’t finish that request."}${retryHint}`);
+    }
     renderPlan(plan);
     document.querySelector("#results").scrollIntoView({ behavior: "smooth", block: "start" });
     if (plan.mode === "preview") showToast("The app is in preview mode. Connect the Qloo key on the server for live matches.");

@@ -15,6 +15,9 @@ const requestsByIp = new Map();
 const citySearchesByIp = new Map();
 const citySuggestionCache = new Map();
 const favoriteCache = new Map();
+const qlooRequestSpacingMs = 400;
+let qlooRequestQueue = Promise.resolve();
+let lastQlooRequestAt = 0;
 const entityTypes = ["urn:entity:person", "urn:entity:artist", "urn:entity:movie", "urn:entity:place"];
 const sampleStops = [
   { title: "The candlelit table", meta: "Dinner · Japanese comfort food", reason: "A familiar favorite, with a menu that leaves room to explore." },
@@ -33,11 +36,12 @@ const contentTypes = {
   ".webp": "image/webp"
 };
 
-function sendJson(response, status, value) {
+function sendJson(response, status, value, extraHeaders = {}) {
   response.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
     "cache-control": "no-store",
-    "x-content-type-options": "nosniff"
+    "x-content-type-options": "nosniff",
+    ...extraHeaders
   });
   response.end(JSON.stringify(value));
 }
@@ -142,15 +146,22 @@ function isCitySearchRateLimited(request) {
 }
 
 async function qlooRequest(path, options = {}) {
-  const response = await fetch(`${qlooBaseUrl}${path}`, {
-    ...options,
-    signal: AbortSignal.timeout(12000),
-    headers: {
-      accept: "application/json",
-      "x-api-key": qlooApiKey,
-      ...options.headers
-    }
+  const request = qlooRequestQueue.then(async () => {
+    const waitMs = Math.max(0, lastQlooRequestAt + qlooRequestSpacingMs - Date.now());
+    if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
+    lastQlooRequestAt = Date.now();
+    return fetch(`${qlooBaseUrl}${path}`, {
+      ...options,
+      signal: AbortSignal.timeout(12000),
+      headers: {
+        accept: "application/json",
+        "x-api-key": qlooApiKey,
+        ...options.headers
+      }
+    });
   });
+  qlooRequestQueue = request.then(() => undefined, () => undefined);
+  const response = await request;
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     const safeMessage = response.status === 401 || response.status === 403
@@ -158,9 +169,16 @@ async function qlooRequest(path, options = {}) {
       : response.status === 429
         ? "Qloo is temporarily rate-limiting requests. Please try again shortly."
         : "Qloo could not complete that recommendation request.";
+    const retryAfterHeader = response.headers.get("retry-after");
+    const retryAfterSeconds = retryAfterHeader
+      ? Math.max(1, Math.ceil(Number.isFinite(Number(retryAfterHeader))
+        ? Number(retryAfterHeader)
+        : (Date.parse(retryAfterHeader) - Date.now()) / 1000))
+      : undefined;
     throw Object.assign(new Error(safeMessage), {
       status: response.status === 429 ? 503 : 502,
-      upstreamStatus: response.status
+      upstreamStatus: response.status,
+      retryAfterSeconds
     });
   }
   return data;
@@ -465,8 +483,9 @@ async function handleSharedLunch(request, response) {
     return sendJson(response, 200, result);
   } catch (error) {
     return sendJson(response, error.status || 500, {
-      error: error.status ? error.message : "The lunch planner couldn’t reach Qloo. Please try again in a moment."
-    });
+      error: error.status ? error.message : "The lunch planner couldn’t reach Qloo. Please try again in a moment.",
+      ...(error.retryAfterSeconds ? { retryAfterSeconds: error.retryAfterSeconds } : {})
+    }, error.retryAfterSeconds ? { "retry-after": String(error.retryAfterSeconds) } : {});
   }
 }
 
