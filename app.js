@@ -4,14 +4,14 @@ const citySuggestions = document.querySelector("#city-suggestions");
 const peopleGrid = document.querySelector("#people-grid");
 const rememberInput = document.querySelector("#remember-table");
 const recommendations = document.querySelector("#recommendations");
+const results = document.querySelector("#results");
+const resultsNote = document.querySelector("#results-note");
 const context = document.querySelector("#results-context");
 const toast = document.querySelector("#toast");
 const submitButton = form.querySelector("button[type='submit']");
 const resultBadge = document.querySelector("#result-badge");
-const modePill = document.querySelector("#mode-pill");
 const refreshButton = document.querySelector("#refresh-button");
 const addPersonButton = document.querySelector("#add-person");
-const exampleButton = document.querySelector("#example-button");
 const tableStorageKey = "common-table-profile-v1";
 let toastTimer;
 let lastRequest = null;
@@ -32,7 +32,7 @@ function memberCard(person = {}) {
   const favorites = escapeHtml(Array.isArray(person.favorites) ? person.favorites.join(", ") : person.favorites || "");
   const card = document.createElement("article");
   card.className = "person-card";
-  card.innerHTML = `<div class="person-top"><span class="person-avatar" aria-hidden="true">${number.toString().padStart(2, "0")}</span><label class="person-name-label">Name <input class="person-name" maxlength="40" value="${name}" aria-label="Person ${number} name" /></label><button class="remove-person" type="button" aria-label="Remove person ${number}" ${number <= 2 ? "disabled" : ""}>×</button></div><label class="person-taste-label">Taste anchors<input class="person-favorites" maxlength="240" value="${favorites}" placeholder="e.g. Virat Kohli, Succession" aria-label="Person ${number} taste anchors" required /></label><span class="person-hint">Separate a few favorites with commas</span>`;
+  card.innerHTML = `<div class="person-top"><span class="person-avatar" aria-hidden="true">${number.toString().padStart(2, "0")}</span><label class="person-name-label">Name <input class="person-name" maxlength="40" value="${name}" aria-label="Person ${number} name" /></label><button class="remove-person" type="button" aria-label="Remove person ${number}" ${number <= 2 ? "disabled" : ""}>×</button></div><label class="person-taste-label">A few favorites<input class="person-favorites" maxlength="240" value="${favorites}" placeholder="e.g. Virat Kohli, Taylor Swift" aria-label="Person ${number} favorites" required /></label><span class="person-hint">Add one or two names, separated by commas</span>`;
   card.querySelector(".remove-person").addEventListener("click", () => {
     if (peopleGrid.children.length <= 2) return;
     card.remove();
@@ -48,7 +48,7 @@ function refreshMemberControls() {
   cards.forEach((card, index) => {
     card.querySelector(".person-avatar").textContent = String(index + 1).padStart(2, "0");
     card.querySelector(".person-name").setAttribute("aria-label", `Person ${index + 1} name`);
-    card.querySelector(".person-favorites").setAttribute("aria-label", `Person ${index + 1} taste anchors`);
+    card.querySelector(".person-favorites").setAttribute("aria-label", `Person ${index + 1} favorites`);
     const removeButton = card.querySelector(".remove-person");
     removeButton.disabled = cards.length <= 2;
     removeButton.setAttribute("aria-label", `Remove person ${index + 1}`);
@@ -175,11 +175,18 @@ document.addEventListener("click", (event) => { if (!event.target.closest(".city
 
 function renderPlan(plan) {
   lastPlan = plan;
+  results.hidden = false;
   const places = plan.places || [];
   if (!places.length) {
-    recommendations.innerHTML = `<div class="empty-state"><span>✳</span><strong>Ready for the first shared lunch?</strong><p>Try the live example above, or add each person's taste anchors to find a real overlap.</p></div>`;
-    resultBadge.textContent = plan.mode === "preview" ? "PREVIEW ONLY" : "READY WHEN YOU ARE";
-    context.textContent = `Your table in ${plan.city || cityInput.value} is set up. Find places both people already have a Qloo affinity for.`;
+    resultsNote.hidden = true;
+    const unavailable = plan.mode === "preview";
+    recommendations.innerHTML = unavailable
+      ? `<div class="empty-state"><span>↻</span><strong>Recommendations are taking a break.</strong><p>Please try again in a little while.</p></div>`
+      : `<div class="empty-state"><span>✦</span><strong>No shared picks this time.</strong><p>Try a different favorite or a nearby neighborhood to widen the search.</p></div>`;
+    resultBadge.textContent = unavailable ? "TEMPORARILY UNAVAILABLE" : "TRY ANOTHER MIX";
+    context.textContent = unavailable
+      ? "We couldn’t load nearby recommendations just now. Your table is ready to try again."
+      : `We couldn’t find enough overlap near ${plan.city || cityInput.value} with these favorites.`;
     refreshButton.hidden = true;
     return;
   }
@@ -189,10 +196,11 @@ function renderPlan(plan) {
     const scoreRows = scores.map(({ name, score, signals }) => `<div class="score-row"><span><i></i>${escapeHtml(name)}</span><strong>${Number(score).toFixed(2)}</strong>${signals?.length ? `<small>taste: ${escapeHtml(signals.join(", "))}</small>` : ""}</div>`).join("");
     const tags = (place.tags || []).map((tag) => `<span class="place-tag">${escapeHtml(tag)}</span>`).join("");
     const percent = Math.round(Number(place.balancedFit || 0) * 100);
-    return `<article class="rec-card"><div class="rec-topline"><span class="rec-type">COMMON PICK <b>0${index + 1}</b></span><span class="fair-score" aria-label="Group fit ${place.balancedFit.toFixed(2)} out of 1"><strong>${escapeHtml(place.balancedFit.toFixed(2))}</strong><small>GROUP FIT</small></span></div><h3 class="rec-title">${escapeHtml(place.name)}</h3><p class="rec-meta"><span>RESTAURANT</span><i>·</i>${escapeHtml(place.location || plan.city)}</p><div class="fit-meter" role="img" aria-label="Group fit ${percent} percent"><span style="width:${Math.min(100, percent)}%"></span></div><p class="score-caption">Qloo fit for each person · higher is stronger</p><div class="score-list">${scoreRows}</div>${tags ? `<div class="place-tags">${tags}</div>` : ""}<a class="rec-link" href="${escapeHtml(place.url)}" target="_blank" rel="noreferrer">Find this place on Maps <span aria-hidden="true">↗</span></a></article>`;
+    return `<article class="rec-card"><div class="rec-topline"><span class="rec-type">A PLACE FOR EVERYONE <b>0${index + 1}</b></span><span class="fair-score" aria-label="Group fit ${place.balancedFit.toFixed(2)} out of 1"><strong>${escapeHtml(place.balancedFit.toFixed(2))}</strong><small>GROUP FIT</small></span></div><h3 class="rec-title">${escapeHtml(place.name)}</h3><p class="rec-meta"><span>RESTAURANT</span><i>·</i>${escapeHtml(place.location || plan.city)}</p><div class="fit-meter" role="img" aria-label="Group fit ${percent} percent"><span style="width:${Math.min(100, percent)}%"></span></div><p class="score-caption">Match strength for each person · higher is stronger</p><div class="score-list">${scoreRows}</div>${tags ? `<div class="place-tags">${tags}</div>` : ""}<a class="rec-link" href="${escapeHtml(place.url)}" target="_blank" rel="noreferrer">View on Maps <span aria-hidden="true">↗</span></a></article>`;
   }).join("");
-  resultBadge.textContent = "LIVE QLOO OVERLAP";
-  context.textContent = `${places.length} restaurant${places.length === 1 ? "" : "s"} surfaced for ${people.join(" + ")} in ${plan.city}. Every pick appeared in each person’s separate Qloo results.`;
+  resultsNote.hidden = false;
+  resultBadge.textContent = `${places.length} ${places.length === 1 ? "PLACE" : "PLACES"} FOR YOUR TABLE`;
+  context.textContent = `We found ${places.length === 1 ? "a place" : "places"} that came through for ${people.join(" + ")} near ${plan.city}. Compare how each one fits, then pick the table that feels right.`;
   refreshButton.hidden = false;
 }
 
@@ -205,7 +213,7 @@ function showToast(message) {
 
 async function requestPlan(request, excludeIds = []) {
   submitButton.disabled = true;
-  submitButton.querySelector("span:first-child").textContent = "Finding the overlap…";
+  submitButton.querySelector("span:first-child").textContent = "Finding good places…";
   refreshButton.disabled = true;
   try {
     const response = await fetch("/api/plan", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...request, excludeIds }) });
@@ -218,12 +226,11 @@ async function requestPlan(request, excludeIds = []) {
     }
     renderPlan(plan);
     document.querySelector("#results").scrollIntoView({ behavior: "smooth", block: "start" });
-    if (plan.mode === "preview") showToast("The app is in preview mode. Connect the Qloo key on the server for live matches.");
   } catch (error) { showToast(error.message || "Couldn’t reach Common Table. Please try again."); }
   finally {
     submitButton.disabled = false;
     refreshButton.disabled = false;
-    submitButton.querySelector("span:first-child").textContent = "Find our overlap";
+    submitButton.querySelector("span:first-child").textContent = "Find our common ground";
   }
 }
 
@@ -244,25 +251,7 @@ refreshButton.addEventListener("click", () => {
   requestPlan(lastRequest, lastPlan.places.map((place) => place.id).filter(Boolean));
 });
 
-exampleButton.addEventListener("click", () => {
-  cityInput.value = "Bengaluru";
-  rememberInput.checked = false;
-  localStorage.removeItem("common-table-remember");
-  localStorage.removeItem(tableStorageKey);
-  peopleGrid.replaceChildren();
-  peopleGrid.append(memberCard({ name: "You", favorites: ["Virat Kohli"] }), memberCard({ name: "Taylor", favorites: ["Taylor Swift"] }));
-  refreshMemberControls();
-  lastRequest = { city: "Bengaluru", participants: collectTable() };
-  requestPlan(lastRequest);
-});
-
-fetch("/api/health").then((response) => response.json()).then(({ mode }) => {
-  modePill.innerHTML = mode === "live" ? "<i></i> Qloo live" : "<i></i> Preview mode";
-  if (mode === "live") modePill.classList.add("live-mode");
-}).catch(() => { modePill.innerHTML = "<i></i> Qloo status unavailable"; });
-
 peopleGrid.append(memberCard({ name: "You", favorites: "" }), memberCard({ name: "Lunch buddy", favorites: "" }));
 refreshMemberControls();
 rememberInput.checked = localStorage.getItem("common-table-remember") === "true";
 if (rememberInput.checked) loadTable();
-renderPlan({ mode: "ready", city: cityInput.value, places: [] });
