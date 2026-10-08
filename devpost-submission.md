@@ -69,8 +69,9 @@ The hosted MCP endpoint is `https://tastetrail-qloo-hackathon.vercel.app/api/mcp
 - `GET /api/health` returned HTTP 200 and reported live mode.
 - `GET /api/cities?q=San` returned HTTP 200 with six city suggestions.
 - One live `POST /api/plan` for two Bengaluru diners returned HTTP 200, three Qloo-ranked restaurants, and a Google Maps search link for the first pick.
+- A second live plan with different anchors (“Virat Kohli” and “Taylor Swift”) returned HTTP 200, three shared places, distinct participant affinities, and a Maps link.
 - MCP `initialize` returned HTTP 200, and `tools/list` exposed `find_shared_lunch`.
-- The tested planner example used “Virat Kohli” as one taste anchor per diner. Qloo results vary by request; this single check is not a guarantee of future availability or ranking.
+- Qloo results vary by request; these smoke checks do not guarantee future availability or ranking quality across cities and tastes.
 
 ## Screenshot Shot List
 
