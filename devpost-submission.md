@@ -70,15 +70,15 @@ The hosted MCP endpoint is `https://tastetrail-qloo-hackathon.vercel.app/api/mcp
 - `GET /api/cities?q=San` returned HTTP 200 with six city suggestions.
 - One live `POST /api/plan` for two Bengaluru diners returned HTTP 200, three Qloo-ranked restaurants, and a Google Maps search link for the first pick.
 - A second live plan with different anchors (“Virat Kohli” and “Taylor Swift”) returned HTTP 200, three shared places, distinct participant affinities, and a Maps link.
+- The live website flow with those contrasting profiles rendered three cards (Soul City, Puran Da Dhaba, and Indigo XP), separate affinity rows for both diners, and Maps searches containing each venue name and address. Browser console had no warnings or errors during this run.
 - MCP `initialize` returned HTTP 200, and `tools/list` exposed `find_shared_lunch`.
 - Qloo results vary by request; these smoke checks do not guarantee future availability or ranking quality across cities and tastes.
 
 ## Screenshot Shot List
 
 1. `screenshots/common-table-thumbnail.png` — Common Table's lunch-table interface and taste-profile setup; used as the project thumbnail.
-2. Capture a fresh setup screenshot with Bengaluru, Virat Kohli for one diner, and Taylor Swift for the other.
-3. Capture the resulting shared shortlist with both per-person affinity scores and the Maps action visible. The existing `screenshots/common-table-live.png` shows an earlier live result and should be replaced with this contrasting-taste proof.
-4. Capture the MCP `tools/list` response showing `find_shared_lunch` for the agent integration proof.
+2. `screenshots/common-table-contrast-input.jpg` — Bengaluru with Virat Kohli for one diner and Taylor Swift for the other.
+3. `screenshots/common-table-contrast-results.jpg` — three live shared picks with both affinity rows and Maps actions. The MCP `tools/list` response was verified separately and exposed `find_shared_lunch`.
 
 ## Public Demo Link
 
@@ -104,7 +104,7 @@ Not recorded yet. Requirement status is unverified because Devpost's connected t
 ## Submission Readiness Notes
 
 - Core web, Qloo, city-search, and MCP routes have passed focused live checks.
-- Replace the older live-result screenshot with the contrasting-profile run and capture the MCP tool list.
+- Upload the new contrasting-profile screenshots to the Devpost gallery and replace the older live-result screenshot.
 - Record the 50-second demo after checking the live event's video requirement.
 - Confirm the current Devpost form fields and judging criteria before finalizing the project write-up; Devpost's connected tools were unavailable during this draft update.
 

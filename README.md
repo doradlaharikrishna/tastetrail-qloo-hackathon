@@ -59,10 +59,11 @@ The web interface calls `POST /api/plan` with the same fields and optional `excl
 
 - Live demo: https://tastetrail-qloo-hackathon.vercel.app/
 - Source: https://github.com/doradlaharikrishna/tastetrail-qloo-hackathon
-- [Live Qloo lunch-plan screenshot](screenshots/common-table-live.png)
+- [Contrasting diner setup screenshot](screenshots/common-table-contrast-input.jpg)
+- [Live Qloo shared-picks screenshot](screenshots/common-table-contrast-results.jpg)
 - [Project thumbnail](screenshots/common-table-thumbnail.png)
 
-![Common Table live demo](screenshots/common-table-thumbnail.png)
+![Common Table live recommendations for diners with different taste anchors](screenshots/common-table-contrast-results.jpg)
 
 ## Verification
 
