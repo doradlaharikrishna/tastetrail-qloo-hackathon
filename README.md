@@ -28,7 +28,7 @@ Open `http://localhost:3000`. The key stays on the server and is never sent to b
 The app exposes a Model Context Protocol Streamable HTTP endpoint at:
 
 ```text
-https://tastetrail-qloo-hackathon.vercel.app/mcp
+https://tastetrail-qloo-hackathon.vercel.app/api/mcp
 ```
 
 Tool: **`find_shared_lunch`** — accepts `city` and two to four `participants`; each participant has a `name` and one to three `favorites`. It returns shared Qloo-ranked restaurants, individual affinities, useful tags, and name/address-based Google Maps search URLs. The MCP server implements `initialize`, `ping`, `tools/list`, and `tools/call` over JSON-RPC 2.0 POST requests. Clients should send an `Accept` header containing `application/json, text/event-stream`.

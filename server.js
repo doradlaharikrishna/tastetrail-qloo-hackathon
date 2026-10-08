@@ -656,7 +656,7 @@ export default async function handler(request, response) {
   }
   if (request.method === "POST" && url.pathname === "/api/trail") return handleTrail(request, response);
   if (request.method === "POST" && url.pathname === "/api/plan") return handleSharedLunch(request, response);
-  if (url.pathname === "/mcp") return handleMcp(request, response);
+  if (url.pathname === "/mcp" || url.pathname === "/api/mcp") return handleMcp(request, response);
   if (url.pathname.startsWith("/api/")) return sendJson(response, 404, { error: "Not found." });
   if (request.method !== "GET" && request.method !== "HEAD") {
     response.writeHead(405, { allow: "GET, HEAD" }).end("Method not allowed");
