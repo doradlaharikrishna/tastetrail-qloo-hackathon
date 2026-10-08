@@ -76,7 +76,9 @@ The hosted MCP endpoint is `https://tastetrail-qloo-hackathon.vercel.app/api/mcp
 ## Screenshot Shot List
 
 1. `screenshots/common-table-thumbnail.png` — Common Table's lunch-table interface and taste-profile setup; used as the project thumbnail.
-2. `screenshots/common-table-live.png` — the live Qloo Bengaluru shortlist, individual affinities, venue tags, and Maps actions; uploaded to the Devpost project gallery.
+2. Capture a fresh setup screenshot with Bengaluru, Virat Kohli for one diner, and Taylor Swift for the other.
+3. Capture the resulting shared shortlist with both per-person affinity scores and the Maps action visible. The existing `screenshots/common-table-live.png` shows an earlier live result and should be replaced with this contrasting-taste proof.
+4. Capture the MCP `tools/list` response showing `find_shared_lunch` for the agent integration proof.
 
 ## Public Demo Link
 
@@ -89,19 +91,28 @@ The hosted MCP endpoint is `https://tastetrail-qloo-hackathon.vercel.app/api/mcp
 
 ## Demo Video
 
-Not recorded yet. Requirement status is unverified because Devpost's connected tools were unavailable during this draft update. Outline: introduce the recurring team-lunch decision; enter two taste profiles and a city; show the shared restaurant results, individual Qloo affinity, and Maps action; finish by showing the `find_shared_lunch` MCP tool.
+Not recorded yet. Requirement status is unverified because Devpost's connected tools were unavailable during this draft update.
+
+### 50-second demo script
+
+- **0–5 sec:** “A team lunch poll can turn into a debate. The first suggestion isn't necessarily the place everyone will enjoy.”
+- **5–15 sec:** Set Bengaluru; enter Virat Kohli for one diner and Taylor Swift for the other; select “Find our common ground.”
+- **15–32 sec:** Show the three live shared picks. Point out that each card shows a separate affinity per diner, while the shortlist contains only restaurants returned for both.
+- **32–40 sec:** Open “View on Maps” for one pick and show the restaurant name and address in the Maps search.
+- **40–50 sec:** Show the MCP `find_shared_lunch` tool and close: “The same Qloo-backed group planner is available to an assistant.”
 
 ## Submission Readiness Notes
 
 - Core web, Qloo, city-search, and MCP routes have passed focused live checks.
-- Capture fresh screenshots and record a short demo video after reviewing the production flow.
+- Replace the older live-result screenshot with the contrasting-profile run and capture the MCP tool list.
+- Record the 50-second demo after checking the live event's video requirement.
 - Confirm the current Devpost form fields and judging criteria before finalizing the project write-up; Devpost's connected tools were unavailable during this draft update.
 
 ## Known Limitations
 
 - Results and city suggestions depend on Qloo API availability, rate limits, and the current catalog.
 - The app does not verify opening hours, reservations, dietary suitability, or business websites.
-- Production validation covered one recommendation request; it does not establish broad reliability or ranking quality across cities and tastes.
+- Production validation covered two recommendation requests, including one with different tastes; it does not establish broad reliability or ranking quality across cities and tastes.
 
 ## TODO Official Form Fields
 
