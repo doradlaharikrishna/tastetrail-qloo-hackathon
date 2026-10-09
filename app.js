@@ -215,7 +215,7 @@ function renderPlan(plan) {
   const usedDiningPreferences = (plan.diningPreferences || []).flatMap((person) => person.usedByQloo?.map((preference) => `${person.name}: ${preference}`) || []);
   const unverifiedDiningPreferences = (plan.diningPreferences || []).flatMap((person) => person.unverified?.map((preference) => `${person.name}: ${preference}`) || []);
   if (usedDiningPreferences.length) context.textContent += ` Qloo also used these dining tags to influence affinity: ${usedDiningPreferences.join("; ")}.`;
-  if (unverifiedDiningPreferences.length) context.textContent += ` Not verified by Qloo: ${unverifiedDiningPreferences.join("; ")}. These did not affect ranking; check them with the restaurant.`;
+  if (unverifiedDiningPreferences.length) context.textContent += ` Qloo did not use these inputs in ranking: ${unverifiedDiningPreferences.join("; ")}. Confirm practical details with the restaurant, or enter a complete name if one was meant as a favorite.`;
   refreshButton.hidden = false;
 }
 

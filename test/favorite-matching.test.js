@@ -55,8 +55,7 @@ test("does not call Insights when a generic input only partially matches an enti
         ]
       }),
       (error) => error.status === 422
-        && error.message.includes("couldn’t match “spicy”")
-        && error.message.includes("didn’t use it or guess at a lookalike")
+        && error.message.includes("at least one exact named taste anchor")
     );
     assert.equal(requests.some((url) => url.includes("/v2/insights")), false);
   } finally {
@@ -68,11 +67,14 @@ test("routes an exact cuisine tag entered as a favorite into dining signals", as
   const originalFetch = globalThis.fetch;
   const insightBodies = [];
   const requests = [];
+  const searchQueries = [];
+  const tagQueries = [];
   globalThis.fetch = async (url, options = {}) => {
     const parsed = new URL(String(url));
     requests.push(parsed.pathname);
     if (parsed.pathname === "/v2/tags") {
       const query = parsed.searchParams.get("filter.query");
+      tagQueries.push(query);
       const tags = query?.toLowerCase() === "biryani"
         ? [{ id: "urn:tag:specialty_dish:place:biryani", name: "Biryani", type: "urn:tag:specialty_dish:place" }]
         : [];
@@ -80,6 +82,7 @@ test("routes an exact cuisine tag entered as a favorite into dining signals", as
     }
     if (parsed.pathname === "/search") {
       const query = parsed.searchParams.get("query");
+      searchQueries.push(query);
       const type = parsed.searchParams.get("type");
       const entity = type === "urn:entity:artist" && ["Virat Kohli", "Taylor Swift"].includes(query)
         ? [{ entity_id: `artist-${query.toLowerCase().replaceAll(" ", "-")}`, name: query }]
@@ -107,7 +110,7 @@ test("routes an exact cuisine tag entered as a favorite into dining signals", as
     const plan = await sharedLunchPlan({
       city: "Bengaluru",
       participants: [
-        { name: "Hari", favorites: ["Virat Kohli", "biryani"], diningPreferences: ["more quantity"] },
+        { name: "Hari", favorites: ["Virat Kohli", "biryani", "more quantity"] },
         { name: "Chandrika", favorites: ["Taylor Swift"], diningPreferences: ["Biryani"] }
       ]
     });
@@ -116,6 +119,8 @@ test("routes an exact cuisine tag entered as a favorite into dining signals", as
     assert.deepEqual(plan.diningPreferences[0].unverified, ["more quantity"]);
     assert.equal(plan.diningPreferences[1].usedByQloo[0], "Biryani");
     assert.deepEqual(plan.matchedFavorites[0].favorites, ["Virat Kohli"]);
+    assert.equal(searchQueries.includes("more quantity"), false, "known portion requests do not use Qloo entity-search calls");
+    assert.equal(tagQueries.includes("more quantity"), false, "known portion requests do not use Qloo tag-search calls");
     assert.ok(insightBodies.every((body) => body["signal.interests.tags"]?.some((tag) => tag.tag === biryaniSignal.tag)));
     assert.ok(requests.filter((path) => path === "/v2/tags").length <= 2, "identical dining tags are deduplicated by the result cache");
     assert.ok(plan.places[0].affinityByParticipant.every((person) => person.signals.includes("Biryani")));
