@@ -69,9 +69,17 @@
 
             <div class="form-footer">
               <div class="method-note"><span class="method-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M7 12h10M12 7c2.3 2.1 2.3 7.9 0 10m0-10c-2.3 2.1-2.3 7.9 0 10" stroke="currentColor" stroke-width="1.4"/></svg></span><span><strong>One good choice, together</strong><small>Every pick has to work for the whole table.</small></span></div>
+              <label class="assist-toggle"><input id="groq-assist" type="checkbox" /><span><strong>Allow Groq to help with an unmatched favorite</strong><small>Only unmatched favorite text is sent, without city or table names. Qloo must verify the exact name, and it is used only if you approve it.</small></span></label>
               <button class="primary-button submit-button" type="submit"><span>Find our common ground</span><span aria-hidden="true">↗</span></button>
             </div>
           </form>
+        </section>
+
+        <section class="match-review" id="match-review" aria-live="polite" aria-labelledby="match-review-title" hidden>
+          <p class="section-kicker">NAME CHECK</p>
+          <h2 id="match-review-title">Qloo found a possible exact match.</h2>
+          <p class="match-review-intro">Groq suggested a complete name and Qloo matched it exactly. Your original stays in place unless you choose a suggestion.</p>
+          <div class="match-suggestions" id="match-suggestions"></div>
         </section>
 
         <section class="results" id="results" aria-live="polite" aria-labelledby="results-title" hidden>

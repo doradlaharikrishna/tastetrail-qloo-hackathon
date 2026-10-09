@@ -24,6 +24,8 @@ npm start
 
 Open `http://localhost:3000`. The key stays on the server and is never sent to browser code. The table profile is stored in the browser's local storage only when “Remember our table” is enabled. Without the key, the planner displays a clear preview state rather than fabricated recommendations.
 
+Optionally set `GROQ_API_KEY` to enable the unchecked “Allow Groq to help with an unmatched favorite” option. If a named taste anchor cannot be resolved, Common Table sends only that unmatched favorite text to Groq, without the city or table names, and asks for at most one possible full name. It then checks the candidate against Qloo and displays it for the user to approve. Neither the model nor Qloo can silently replace the original input. If Groq is unavailable or no exact Qloo match is found, the app keeps the existing unresolved-name error. Groq is not used for dining preferences, and it cannot prevent Qloo rate limits or guarantee restaurant results.
+
 ## Agent interface
 
 The app exposes a Model Context Protocol Streamable HTTP endpoint at:
@@ -54,6 +56,7 @@ The web interface calls `POST /api/plan` with the same fields and optional `excl
 - A dependency-free Node.js HTTP server for static files, validation, rate limiting, Qloo calls, and the MCP endpoint.
 - Qloo `/search` resolves supported people, artists, films, and places; `/v2/insights` is called once per participant with restaurant category, locality, and explainability filters.
 - The API key is provided via the server-side `QLOO_API_KEY` environment variable. `.env` is ignored by Git. Never put the key in client code or commit it.
+- Optional Groq-assisted name suggestions use the server-side `GROQ_API_KEY` environment variable and `openai/gpt-oss-20b` by default. Never put this key in browser code or commit it.
 - MIT license.
 
 ## Public links

@@ -156,7 +156,23 @@ h2 { margin-bottom: 0; font: 700 26px/1.2 "Manrope", sans-serif; letter-spacing:
 .method-note strong, .method-note small { display: block; }
 .method-note strong { margin-bottom: 3px; color: #3b4c42; font-size: 11px; }
 .method-note small { color: var(--quiet); font-size: 9px; }
+.assist-toggle { display: flex; flex: 1 1 250px; align-items: flex-start; gap: 8px; max-width: 360px; color: #59665c; cursor: pointer; }
+.assist-toggle input { flex: 0 0 auto; margin: 2px 0 0; accent-color: var(--green); }
+.assist-toggle strong, .assist-toggle small { display: block; }
+.assist-toggle strong { color: #415148; font-size: 10px; }
+.assist-toggle small { margin-top: 4px; color: var(--quiet); font-size: 9px; line-height: 1.5; }
 .submit-button { min-width: 220px; }
+
+.match-review { scroll-margin-top: 25px; margin-top: 28px; padding: 25px 28px; border: 1px solid #dce6dc; border-radius: 13px; background: #f8faf6; }
+.match-review h2 { font-size: 21px; }
+.match-review-intro { max-width: 650px; margin: 8px 0 15px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.match-suggestions { display: grid; gap: 9px; }
+.match-suggestion { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 15px; border: 1px solid #e2e9e0; border-radius: 9px; background: #fff; }
+.match-suggestion p { margin: 4px 0 0; color: var(--muted); font-size: 10px; }
+.match-suggestion p strong { color: #304239; }
+.match-person { color: var(--quiet); font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+.match-use-button { flex: 0 0 auto; padding: 9px 12px; border: 1px solid #cbd9cd; border-radius: 7px; color: var(--green); background: #f5f8f4; font-size: 10px; font-weight: 700; }
+.match-use-button:hover { color: white; background: var(--green); }
 
 .results { scroll-margin-top: 25px; padding: 59px 0 0; }
 .results-heading { align-items: flex-end; margin-bottom: 12px; }
@@ -280,7 +296,10 @@ h2 { margin-bottom: 0; font: 700 26px/1.2 "Manrope", sans-serif; letter-spacing:
   .table-actions { align-items: flex-start; flex-direction: column; gap: 8px; padding-bottom: 17px; }
   .privacy-note { font-size: 9px; }
   .form-footer { align-items: stretch; flex-direction: column; gap: 14px; padding-top: 16px; }
+  .assist-toggle { max-width: none; }
   .submit-button { width: 100%; }
+  .match-review { padding: 20px 17px; }
+  .match-suggestion { align-items: flex-start; flex-direction: column; }
   .results { padding-top: 40px; }
   .results-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
   .results-heading h2 { font-size: 23px; }

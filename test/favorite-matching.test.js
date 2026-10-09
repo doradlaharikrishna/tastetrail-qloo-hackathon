@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 process.env.QLOO_API_KEY = "test-key";
+process.env.GROQ_API_KEY = "test-groq-key";
 const { isExactDiningTagMatch, isExactFavoriteMatch, sharedLunchPlan } = await import("../server.js");
 
 test("normalizes case and accents for exact named Qloo entities", () => {
@@ -130,6 +131,100 @@ test("routes an exact cuisine tag entered as a favorite into dining signals", as
     assert.ok(insightBodies.every((body) => body["signal.interests.tags"]?.some((tag) => tag.tag === biryaniSignal.tag)));
     assert.ok(requests.filter((path) => path === "/v2/tags").length <= 2, "identical dining tags are deduplicated by the result cache");
     assert.ok(plan.places[0].affinityByParticipant.every((person) => person.signals.includes("Biryani")));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+function qlooPayload(url) {
+  const parsed = new URL(String(url));
+  if (parsed.pathname === "/v2/tags") return { results: { tags: [] } };
+  if (parsed.pathname === "/search") {
+    const query = parsed.searchParams.get("query");
+    const type = parsed.searchParams.get("type");
+    if (query === "Virat Kohli" && type === "urn:entity:person") {
+      return { results: { entities: [{ entity_id: "virat-kohli", name: "Virat Kohli" }] } };
+    }
+    if (query === "Taylor Swift" && type === "urn:entity:artist") {
+      return { results: { entities: [{ entity_id: "taylor-swift", name: "Taylor Swift" }] } };
+    }
+    return { results: { entities: [] } };
+  }
+  throw new Error(`Unexpected Qloo request: ${parsed.pathname}`);
+}
+
+test("offers a Groq candidate only after an exact Qloo match and explicit user review", async () => {
+  const originalFetch = globalThis.fetch;
+  const groqRequests = [];
+  const qlooRequests = [];
+  globalThis.fetch = async (url, options = {}) => {
+    if (String(url).startsWith("https://api.groq.com/")) {
+      const body = JSON.parse(options.body);
+      groqRequests.push({ url: String(url), body, authorization: options.headers.authorization });
+      return new Response(JSON.stringify({
+        choices: [{ message: { content: JSON.stringify({ suggestions: [{ id: "item-1", candidates: ["Virat Kohli"] }] }) } }]
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }
+    qlooRequests.push(String(url));
+    return new Response(JSON.stringify(qlooPayload(url)), { status: 200, headers: { "content-type": "application/json" } });
+  };
+
+  try {
+    await assert.rejects(
+      sharedLunchPlan({
+        city: "Bengaluru",
+        allowGroqAssist: true,
+        participants: [
+          { name: "Hari", favorites: ["Virat"] },
+          { name: "Chandrika", favorites: ["Taylor Swift"] }
+        ]
+      }),
+      (error) => {
+        assert.equal(error.status, 409);
+        assert.deepEqual(error.suggestions, [{
+          participantIndex: 0,
+          favoriteIndex: 0,
+          participantName: "Hari",
+          original: "Virat",
+          suggested: "Virat Kohli",
+          verifiedBy: "Qloo"
+        }]);
+        return true;
+      }
+    );
+    assert.equal(groqRequests.length, 1);
+    assert.equal(groqRequests[0].url, "https://api.groq.com/openai/v1/chat/completions");
+    assert.equal(groqRequests[0].body.model, "openai/gpt-oss-20b");
+    assert.equal(groqRequests[0].authorization, "Bearer test-groq-key");
+    assert.equal(groqRequests[0].body.messages[1].content.includes("Bengaluru"), false);
+    assert.equal(groqRequests[0].body.messages[1].content.includes("Hari"), false);
+    assert.equal(qlooRequests.some((url) => url.includes("/v2/insights")), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("does not call Groq when the user did not opt in", async () => {
+  const originalFetch = globalThis.fetch;
+  let groqCalls = 0;
+  globalThis.fetch = async (url) => {
+    if (String(url).startsWith("https://api.groq.com/")) groqCalls += 1;
+    return new Response(JSON.stringify(qlooPayload(url)), { status: 200, headers: { "content-type": "application/json" } });
+  };
+
+  try {
+    await assert.rejects(
+      sharedLunchPlan({
+        city: "Bengaluru",
+        allowGroqAssist: false,
+        participants: [
+          { name: "Hari", favorites: ["Virat"] },
+          { name: "Chandrika", favorites: ["Taylor Swift"] }
+        ]
+      }),
+      (error) => error.status === 422 && error.message.includes("didn’t recognize “Virat”")
+    );
+    assert.equal(groqCalls, 0);
   } finally {
     globalThis.fetch = originalFetch;
   }

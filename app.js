@@ -8,6 +8,9 @@ const results = document.querySelector("#results");
 const resultsNote = document.querySelector("#results-note");
 const context = document.querySelector("#results-context");
 const toast = document.querySelector("#toast");
+const groqAssistInput = document.querySelector("#groq-assist");
+const matchReview = document.querySelector("#match-review");
+const matchSuggestions = document.querySelector("#match-suggestions");
 const submitButton = form.querySelector("button[type='submit']");
 const resultBadge = document.querySelector("#result-badge");
 const refreshButton = document.querySelector("#refresh-button");
@@ -19,6 +22,7 @@ let lastPlan = null;
 let citySearchTimer;
 let citySearchController;
 let activeCitySuggestion = -1;
+let pendingMatches = [];
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (character) => ({
@@ -231,14 +235,21 @@ async function requestPlan(request, excludeIds = []) {
   submitButton.querySelector("span:first-child").textContent = "Finding good places…";
   refreshButton.disabled = true;
   try {
-    const response = await fetch("/api/plan", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...request, excludeIds }) });
+    const response = await fetch("/api/plan", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...request, allowGroqAssist: groqAssistInput.checked, excludeIds }) });
     const plan = await response.json();
     if (!response.ok) {
+      if (plan.needsConfirmation && Array.isArray(plan.suggestions) && plan.suggestions.length) {
+        showMatchSuggestions(plan.suggestions);
+        matchReview.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
       const retryHint = Number.isFinite(plan.retryAfterSeconds) && plan.retryAfterSeconds > 0
         ? ` Please try again in about ${plan.retryAfterSeconds} seconds.`
         : "";
       throw new Error(`${plan.error || "The shared lunch planner couldn’t finish that request."}${retryHint}`);
     }
+    matchReview.hidden = true;
+    pendingMatches = [];
     renderPlan(plan);
     document.querySelector("#results").scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) { showToast(error.message || "Couldn’t reach Common Table. Please try again."); }
@@ -248,6 +259,44 @@ async function requestPlan(request, excludeIds = []) {
     submitButton.querySelector("span:first-child").textContent = "Find our common ground";
   }
 }
+
+function showMatchSuggestions(suggestions) {
+  pendingMatches = suggestions;
+  matchSuggestions.innerHTML = suggestions.map((suggestion, index) => `
+    <article class="match-suggestion">
+      <div><span class="match-person">${escapeHtml(suggestion.participantName || `Person ${suggestion.participantIndex + 1}`)}</span><p>Entered: <strong>${escapeHtml(suggestion.original)}</strong></p><p>Qloo matched: <strong>${escapeHtml(suggestion.suggested)}</strong></p></div>
+      <button class="match-use-button" type="button" data-match-index="${index}">Use this name</button>
+    </article>`).join("");
+  matchReview.hidden = false;
+}
+
+matchSuggestions.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-match-index]");
+  if (!button) return;
+  const suggestion = pendingMatches[Number(button.dataset.matchIndex)];
+  const card = peopleGrid.children[suggestion?.participantIndex];
+  const field = card?.querySelector(".person-favorites");
+  if (!suggestion || !field) return;
+  const favorites = field.value.split(",").map((favorite) => favorite.trim()).filter(Boolean);
+  const current = favorites[suggestion.favoriteIndex];
+  if (!current || current.toLocaleLowerCase() !== suggestion.original.toLocaleLowerCase()) {
+    matchReview.hidden = true;
+    showToast("That favorite changed. Run the search again to review a fresh match.");
+    return;
+  }
+  favorites[suggestion.favoriteIndex] = suggestion.suggested;
+  field.value = favorites.join(", ");
+  matchReview.hidden = true;
+  pendingMatches = [];
+  lastRequest = { city: cityInput.value.trim(), participants: collectTable() };
+  saveTable();
+  requestPlan(lastRequest);
+});
+
+form.addEventListener("input", () => {
+  matchReview.hidden = true;
+  pendingMatches = [];
+});
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
