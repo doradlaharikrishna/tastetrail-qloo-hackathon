@@ -29,16 +29,19 @@ test("accepts only exact restaurant-relevant Qloo dining tags", () => {
   assert.equal(isExactDiningTagMatch("Biryani", { ...biryaniTag, type: "urn:tag:genre:media:Biryani" }), false);
 });
 
-test("does not call Insights when a generic input only partially matches an entity", async () => {
+test("rejects an ambiguous surname instead of guessing between people or restaurants", async () => {
   const originalFetch = globalThis.fetch;
   const requests = [];
   globalThis.fetch = async (url) => {
     requests.push(String(url));
     const parsed = new URL(String(url));
+    const query = parsed.searchParams.get("query");
     const type = parsed.searchParams.get("type");
-    const entities = type === "urn:entity:place"
-      ? [{ entity_id: "place-biryani", name: "Ghar Banduk Biryani" }]
-      : [];
+    const entities = type === "urn:entity:person" && query === "Singh"
+      ? [{ entity_id: "virat-singh", name: "Virat Singh" }, { entity_id: "other-singh", name: "Another Singh" }]
+      : type === "urn:entity:place"
+        ? [{ entity_id: "place-biryani", name: "Ghar Banduk Biryani" }]
+        : [];
     return new Response(JSON.stringify({ results: { entities } }), {
       status: 200,
       headers: { "content-type": "application/json" }
@@ -50,12 +53,13 @@ test("does not call Insights when a generic input only partially matches an enti
       sharedLunchPlan({
         city: "Bengaluru",
         participants: [
-          { name: "Hari", favorites: ["spicy"] },
+          { name: "Hari", favorites: ["Singh"] },
           { name: "Chandrika", favorites: ["Taylor Swift"] }
         ]
       }),
       (error) => error.status === 422
-        && error.message.includes("at least one exact named taste anchor")
+        && error.message.includes("didn’t recognize “Singh”")
+        && error.message.includes("Virat Kohli")
     );
     assert.equal(requests.some((url) => url.includes("/v2/insights")), false);
   } finally {
@@ -84,7 +88,9 @@ test("routes an exact cuisine tag entered as a favorite into dining signals", as
       const query = parsed.searchParams.get("query");
       searchQueries.push(query);
       const type = parsed.searchParams.get("type");
-      const entity = type === "urn:entity:artist" && ["Virat Kohli", "Taylor Swift"].includes(query)
+      const entity = type === "urn:entity:person" && query === "Kohli"
+        ? [{ entity_id: "person-virat-kohli", name: "Virat Kohli" }]
+        : type === "urn:entity:artist" && query === "Taylor Swift"
         ? [{ entity_id: `artist-${query.toLowerCase().replaceAll(" ", "-")}`, name: query }]
         : [];
       return new Response(JSON.stringify({ results: { entities: entity } }), { status: 200 });
@@ -110,7 +116,7 @@ test("routes an exact cuisine tag entered as a favorite into dining signals", as
     const plan = await sharedLunchPlan({
       city: "Bengaluru",
       participants: [
-        { name: "Hari", favorites: ["Virat Kohli", "biryani", "more quantity"] },
+        { name: "Hari", favorites: ["Kohli", "biryani", "more quantity"] },
         { name: "Chandrika", favorites: ["Taylor Swift"], diningPreferences: ["Biryani"] }
       ]
     });

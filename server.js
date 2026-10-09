@@ -258,6 +258,16 @@ export function isExactFavoriteMatch(query, candidateName, type) {
   return !(type === "urn:entity:place" && !normalizedQuery.includes(" "));
 }
 
+function isPersonSurnameMatch(query, candidateName, type) {
+  const normalizedQuery = normalizeFavorite(query);
+  const candidateTokens = normalizeFavorite(candidateName).split(" ");
+  return type === "urn:entity:person"
+    && normalizedQuery
+    && !normalizedQuery.includes(" ")
+    && candidateTokens.length > 1
+    && candidateTokens.at(-1) === normalizedQuery;
+}
+
 const diningTagTypePrefixes = [
   "urn:tag:specialty_dish:place",
   "urn:tag:genre:restaurant",
@@ -322,15 +332,20 @@ async function lookupFavorite(query) {
         .filter((entity) => entityId(entity) && entity.name)
         .map((entity) => {
           const score = isExactFavoriteMatch(query, entity.name, type) ? 100 : 0;
-          return { id: entityId(entity), name: entity.name, type, score };
+          return { id: entityId(entity), name: entity.name, type, score, surnameMatch: isPersonSurnameMatch(query, entity.name, type) };
         }));
       if (matches.some((match) => match.score === 100)) break;
+      if (type === "urn:entity:person" && new Set(matches.filter((match) => match.surnameMatch).map((match) => match.id)).size === 1) break;
     } catch (error) {
       if ([401, 403, 404, 429].includes(error.upstreamStatus) || error.upstreamStatus >= 500) throw error;
     }
   }
-  const match = matches.filter((candidate) => candidate.score === 100)
+  let match = matches.filter((candidate) => candidate.score === 100)
     .sort((left, right) => right.score - left.score || typePriority.get(left.type) - typePriority.get(right.type))[0] || null;
+  if (!match) {
+    const surnameMatches = new Map(matches.filter((candidate) => candidate.surnameMatch).map((candidate) => [candidate.id, candidate]));
+    if (surnameMatches.size === 1) match = surnameMatches.values().next().value;
+  }
   favoriteCache.set(normalizedQuery, { match, expiresAt: Date.now() + 30 * 60 * 1000 });
   if (favoriteCache.size > 500) favoriteCache.delete(favoriteCache.keys().next().value);
   return match;
@@ -425,6 +440,7 @@ export async function sharedLunchPlan({ city, participants, excludeIds = [] }) {
     const favorites = [];
     const diningTags = [];
     const unverifiedDiningPreferences = [];
+    const unmatchedTasteInputs = [];
     for (const input of participant.favorites) {
       if (isPortionNote(input)) {
         unverifiedDiningPreferences.push(input);
@@ -442,6 +458,7 @@ export async function sharedLunchPlan({ city, participants, excludeIds = [] }) {
           diningTags.push(diningTag);
           continue;
         }
+        unmatchedTasteInputs.push(input);
         unverifiedDiningPreferences.push(input);
         continue;
       }
@@ -461,8 +478,11 @@ export async function sharedLunchPlan({ city, participants, excludeIds = [] }) {
       }
     }
     if (!favorites.length) {
+      const unresolved = unmatchedTasteInputs.length
+        ? ` Qloo didn’t recognize “${unmatchedTasteInputs.join(", ")}” as a full name; try a complete name such as “Virat Kohli”.`
+        : " Food and portion notes alone can’t personalize this plan.";
       throw Object.assign(new Error(
-        `Qloo needs at least one exact named taste anchor for ${participant.name} — a specific person, artist, film, brand, or place they like. Food and portion notes alone can’t personalize this plan.`
+        `Qloo needs a named taste anchor for ${participant.name} — a person, artist, film, brand, or place they like.${unresolved}`
       ), { status: 422 });
     }
     resolvedParticipants.push({ id: `person-${index + 1}`, name: participant.name, favorites, diningTags, unverifiedDiningPreferences });
