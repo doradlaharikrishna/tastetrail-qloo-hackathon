@@ -2,17 +2,17 @@
 
 ## One-line Summary
 
-Lunch your whole table can say yes to: Common Table uses separate Qloo taste reads to find restaurants every diner can get behind.
+One lunch choice for the whole group: Common Table runs separate Qloo taste reads for each diner, keeps only shared restaurant results, and ranks the most balanced fit first.
 
 ## Product Overview
 
-Common Table solves a surprisingly frequent problem: the team lunch chat that never reaches a decision. Two to four people add a few cultural favorites and a city. Common Table asks Qloo for a separate restaurant ranking for every person, keeps only the actual restaurant entities present in everyone's Qloo results, then ranks that overlap with a harmonic mean of their individual affinities. The result is a shortlist where one person's strong preference cannot drown out everyone else's fit.
+Common Table solves the recurring “where should we eat?” decision for teams and friends. Two to four people add a meeting city and a few cultural favorites. Common Table resolves each person’s anchors with Qloo, runs a separate restaurant recommendation for each diner, keeps only the same restaurant entities returned for everyone, then ranks the overlap with the harmonic mean of individual Qloo affinities. Unlike a solo city guide, the decision target is a group: one person’s very high score cannot hide a weak fit for someone else.
 
-Each pick shows the Qloo affinity for each person and any useful venue tags Qloo returned. Map search URLs are built from the exact place name and address. A table can be remembered on one device for the next workday; no account or group-chat setup is required. The same planner is exposed as an MCP tool so an AI assistant can find a fair lunch spot from a natural-language request.
+Each result makes the evidence visible: per-diner Qloo affinity, the lowest individual fit, any matched taste anchors and useful venue tags. The live app explains the shared-result rule and harmonic-mean ranking; affinity is a model score, not a promise or probability. Map searches use the exact venue name and address. A regular table can be remembered on one device without accounts or group-chat setup. An MCP tool exposes the same planner to AI assistants.
 
 ## Problem
 
-Group lunch is a small decision people repeat almost every day. Generic “near me” lists rank popularity or proximity, while a group chat makes the person who suggests first disproportionately influential. A venue that one person loves and everyone else dislikes is not a good group recommendation.
+Office lunch is a small decision people repeat several times a week. Nearby lists optimize for popularity or distance; a group chat often lets the first suggestion win. Common Table turns the constraint into the product: a place must appear in each person’s own Qloo results, then the weakest individual fit remains visible while the group compares options.
 
 ## Key Features
 
@@ -21,17 +21,17 @@ Group lunch is a small decision people repeat almost every day. Generic “near 
 3. It calls Qloo Insights independently for each diner, asking for restaurants in the chosen city and enabling explainability.
 4. It intersects the restaurant entity IDs returned for all diners; a venue must appear in every person's result set.
 5. It calculates a harmonic mean across Qloo affinity scores and explains the shortlist with individual scores, taste signals, and Qloo tags.
-6. “Show another set” excludes the current places. The map action searches the restaurant's exact name and address.
+6. Each result shows individual affinity bars, the lowest diner fit, and matched Qloo taste signals when returned. “Show another set” excludes current places; Maps searches the exact place name and address.
 
 ## How We Used AI
 
-Qloo Taste AI is the matching system. Common Table resolves each person's cultural anchors through Qloo Search, makes separate Qloo Insights requests with locality and restaurant filters, and uses Qloo's affinity and explainability data to find and rank shared venues. It does not generate venue facts or present invented recommendations as Qloo results.
+Qloo Taste AI is the decision engine. Common Table resolves each person's cultural anchors through Qloo Search, makes separate Qloo Insights requests with locality and restaurant filters, intersects canonical Qloo restaurant entity IDs, and ranks the shared results using Qloo affinity and explainability data. Without those independent taste reads, this shortlist and its per-person evidence do not exist. The app does not invent venue facts or present generated text as Qloo output.
 
-The production app also exposes `find_shared_lunch` at `/api/mcp` as a Model Context Protocol Streamable HTTP tool. An assistant can supply a city and two to four taste profiles, then use structured restaurant results, per-person affinities, and map search URLs. The web UI and MCP tool share the same Qloo-backed planner.
+The production app also exposes `find_shared_lunch` at `https://tastetrail-qloo-hackathon.vercel.app/api/mcp` as a Model Context Protocol Streamable HTTP tool. An assistant can supply a city and two to four taste profiles, then use structured restaurant results, per-person affinities, and map search URLs. The web UI and MCP tool share the same Qloo-backed planner.
 
 ## Why This Matters
 
-The initial use case is the recurring office lunch decision. Common Table makes each person's taste contribution visible and ranks shared options so one strong preference cannot mask a poor fit for someone else. The same fair-overlap pattern can support friend groups choosing coffee, dinner, or a neighborhood activity.
+The first audience is the person organizing a recurring team lunch. Common Table makes each diner’s contribution visible, keeps the shared evidence inspectable, and reduces the back-and-forth to a shortlist the group can decide from. It is designed to be useful again next workday: remember the table locally, refresh the shared picks, and open the exact map search.
 
 ## How We Used Codex
 
@@ -68,8 +68,7 @@ The hosted MCP endpoint is `https://tastetrail-qloo-hackathon.vercel.app/api/mcp
 
 - `GET /api/health` returned HTTP 200 and reported live mode.
 - `GET /api/cities?q=San` returned HTTP 200 with six city suggestions.
-- One live `POST /api/plan` for two Bengaluru diners returned HTTP 200, three Qloo-ranked restaurants, and a Google Maps search link for the first pick.
-- A second live plan with different anchors (“Virat Kohli” and “Taylor Swift”) returned HTTP 200, three shared places, distinct participant affinities, and a Maps link.
+- A live plan with contrasting anchors (“Virat Kohli” and “Taylor Swift”) returned HTTP 200, three shared places, distinct participant affinities, and a Maps link.
 - The live website flow with those contrasting profiles rendered three cards (Soul City, Puran Da Dhaba, and Indigo XP), separate affinity rows for both diners, and Maps searches containing each venue name and address. Browser console had no warnings or errors during this run.
 - MCP `initialize` returned HTTP 200, and `tools/list` exposed `find_shared_lunch`.
 - Qloo results vary by request; these smoke checks do not guarantee future availability or ranking quality across cities and tastes.
@@ -91,22 +90,22 @@ The hosted MCP endpoint is `https://tastetrail-qloo-hackathon.vercel.app/api/mcp
 
 ## Demo Video
 
-Not recorded yet. Requirement status is unverified because Devpost's connected tools were unavailable during this draft update.
+The copied Qloo Agentic Hackathon page says demo videos are not required. A short recording could still help showcase the workflow, but it is optional; the hosted, judge-usable application is the required demo.
 
 ### 50-second demo script
 
 - **0–5 sec:** “A team lunch poll can turn into a debate. The first suggestion isn't necessarily the place everyone will enjoy.”
 - **5–15 sec:** Set Bengaluru; enter Virat Kohli for one diner and Taylor Swift for the other; select “Find our common ground.”
-- **15–32 sec:** Show the three live shared picks. Point out that each card shows a separate affinity per diner, while the shortlist contains only restaurants returned for both.
-- **32–40 sec:** Open “View on Maps” for one pick and show the restaurant name and address in the Maps search.
-- **40–50 sec:** Show the MCP `find_shared_lunch` tool and close: “The same Qloo-backed group planner is available to an assistant.”
+- **15–32 sec:** Show the three live shared picks. Point to each diner’s affinity bar and the lowest-fit line; explain that only restaurants returned for both make the shared list.
+- **32–40 sec:** Explain that the harmonic mean weights down a pick when one diner’s fit is weak; open Maps for the exact restaurant and address.
+- **40–50 sec:** Show the MCP `find_shared_lunch` tool and close: “The same Qloo-backed group decision is available to an assistant.”
 
 ## Submission Readiness Notes
 
-- Core web, Qloo, city-search, and MCP routes have passed focused live checks.
-- Upload the new contrasting-profile screenshots to the Devpost gallery and replace the older live-result screenshot.
-- Record the 50-second demo after checking the live event's video requirement.
-- Confirm the current Devpost form fields and judging criteria before finalizing the project write-up; Devpost's connected tools were unavailable during this draft update.
+- The copied event page requires a functional hosted demo, a public source repository with code/assets/run instructions, a project description, and an open-source license file visible in the repository's About section. It states that a demo video is not required.
+- Devpost confirmed “Project submitted!” and opened the public Common Table project page after the finalization form was completed.
+- Core web, Qloo, city-search, and MCP routes have passed focused live checks; the public GitHub repository is visible and GitHub identifies its MIT license.
+- A demo video is optional. The public project page includes its existing gallery image; additional contrasting-profile screenshots could improve the story but are not an eligibility requirement.
 
 ## Known Limitations
 
@@ -114,9 +113,9 @@ Not recorded yet. Requirement status is unverified because Devpost's connected t
 - The app does not verify opening hours, reservations, dietary suitability, or business websites.
 - Production validation covered two recommendation requests, including one with different tastes; it does not establish broad reliability or ranking quality across cities and tastes.
 
-## TODO Official Form Fields
+## Post-submission
 
-- Confirm any event-specific required fields and exact answer limits in the live Devpost form before entering this draft.
+- Devpost confirmed submission at `https://devpost.com/software/tastetrail`. The event page says edits remain available until the deadline.
 
 ## Submission Form Notes
 
@@ -124,4 +123,5 @@ Not recorded yet. Requirement status is unverified because Devpost's connected t
 - Demo URL: https://tastetrail-qloo-hackathon.vercel.app/
 - Repository URL: https://github.com/doradlaharikrishna/tastetrail-qloo-hackathon
 - Existing-project upgrade answer: TasteTrail was created for this hackathon and rebuilt as Common Table with multi-person Qloo affinity intersection, fair shared ranking, an MCP tool, and correct Maps search links.
-- Demo video: check the live event form for the current requirement.
+- Demo video: optional according to the copied event page; hosted working application is required.
+- Current Devpost state: submitted; confirmation message appeared and the public project page opened.

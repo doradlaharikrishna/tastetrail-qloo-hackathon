@@ -184,12 +184,18 @@ h2 { margin-bottom: 0; font: 700 26px/1.2 "Manrope", sans-serif; letter-spacing:
 .score-caption { margin: 8px 0 0; color: #879189; font-size: 9px; }
 .score-list { display: grid; gap: 7px; margin-top: 11px; }
 .score-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 3px 8px; }
-.score-row > span { display: flex; align-items: center; gap: 6px; color: #59665e; font-size: 9px; font-weight: 600; }
-.score-row > span i { width: 6px; height: 6px; border-radius: 50%; background: var(--coral); }
-.score-row:nth-child(2) > span i { background: #7e9d79; }
-.score-row:nth-child(3) > span i { background: #d2ad5f; }
+.score-person { display: flex; align-items: center; gap: 6px; color: #59665e; font-size: 9px; font-weight: 600; }
+.score-person i { width: 6px; height: 6px; border-radius: 50%; background: var(--coral); }
+.score-row:nth-child(2) .score-person i { background: #7e9d79; }
+.score-row:nth-child(3) .score-person i { background: #d2ad5f; }
 .score-row strong { color: #3d4c43; font-size: 9px; }
-.score-row small { grid-column: 1 / -1; padding-left: 12px; color: #929a93; font-size: 8px; }
+.score-meter { grid-column: 1 / -1; height: 3px; overflow: hidden; margin-left: 12px; border-radius: 99px; background: #edf0ec; }
+.score-meter span { height: 100%; display: block; border-radius: inherit; background: #93a991; }
+.score-row small { grid-column: 1 / -1; padding-left: 12px; color: #7b887e; font-size: 8px; }
+.weakest-fit { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 2px 8px; margin-top: 12px; padding-top: 9px; border-top: 1px solid #edf0ec; }
+.weakest-fit > span { color: #879189; font-size: 7px; font-weight: 700; letter-spacing: .08em; }
+.weakest-fit > strong { color: #596c5b; font-size: 10px; }
+.weakest-fit > small { grid-column: 1 / -1; color: #7b887e; font-size: 8px; }
 .place-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
 .place-tag { padding: 5px 8px; border-radius: 99px; color: #55705d; background: #eef3ed; font-size: 8px; }
 .rec-link { display: inline-flex; align-items: center; justify-content: space-between; gap: 5px; margin-top: auto; padding-top: 13px; color: var(--green); font-size: 10px; font-weight: 700; }

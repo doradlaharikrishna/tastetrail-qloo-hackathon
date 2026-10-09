@@ -10,7 +10,8 @@ This is a web app and a callable agent tool for the Qloo Agentic Hackathon. It i
 2. It requests Qloo Insights for restaurants in the selected city for each person separately, with explainability enabled.
 3. It intersects the returned Qloo place entity IDs. A pick must appear in every person's result set.
 4. It ranks shared venues by the harmonic mean of those individual Qloo affinities, so one high score cannot hide a poor fit for someone else.
-5. It shows each affinity and Qloo's useful venue tags. “Find this place on Maps” searches the venue name and address instead of trusting an unverified third-party website field.
+5. It shows each diner’s Qloo affinity as a bar, identifies the lowest individual fit, and includes matched taste signals and useful Qloo venue tags when available. Affinity is a model score, not a probability.
+6. “Find this place on Maps” searches the venue name and address instead of trusting an unverified third-party website field.
 
 ## Run locally
 

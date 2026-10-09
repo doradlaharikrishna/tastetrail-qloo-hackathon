@@ -190,17 +190,25 @@ function renderPlan(plan) {
     refreshButton.hidden = true;
     return;
   }
-  const people = plan.participantNames || (plan.matchedFavorites || []).map((item) => item.name);
   recommendations.innerHTML = places.map((place, index) => {
     const scores = place.affinityByParticipant || [];
-    const scoreRows = scores.map(({ name, score, signals }) => `<div class="score-row"><span><i></i>${escapeHtml(name)}</span><strong>${Number(score).toFixed(2)}</strong>${signals?.length ? `<small>taste: ${escapeHtml(signals.join(", "))}</small>` : ""}</div>`).join("");
+    const scoreRows = scores.map(({ name, score, signals }) => {
+      const value = Number(score);
+      const scoreText = Number.isFinite(value) ? value.toFixed(2) : "—";
+      const scorePercent = Number.isFinite(value) ? Math.round(Math.max(0, Math.min(1, value)) * 100) : 0;
+      return `<div class="score-row"><div class="score-person"><i aria-hidden="true"></i><span>${escapeHtml(name)}</span></div><strong aria-label="Qloo affinity ${escapeHtml(scoreText)}">${escapeHtml(scoreText)}</strong><div class="score-meter" role="img" aria-label="${escapeHtml(name)} Qloo affinity ${escapeHtml(scoreText)}"><span style="width:${scorePercent}%"></span></div>${signals?.length ? `<small>Matched taste: ${escapeHtml(signals.join(", "))}</small>` : ""}</div>`;
+    }).join("");
+    const weakestFit = scores.reduce((lowest, score) => Number(score.score) < Number(lowest.score) ? score : lowest, scores[0]);
+    const weakestFitNote = weakestFit
+      ? `<div class="weakest-fit"><span>LOWEST DINER FIT</span><strong>${Number(weakestFit.score).toFixed(2)}</strong><small>${escapeHtml(weakestFit.name)}</small></div>`
+      : "";
     const tags = (place.tags || []).map((tag) => `<span class="place-tag">${escapeHtml(tag)}</span>`).join("");
     const percent = Math.round(Number(place.balancedFit || 0) * 100);
-    return `<article class="rec-card"><div class="rec-topline"><span class="rec-type">A PLACE FOR EVERYONE <b>0${index + 1}</b></span><span class="fair-score" aria-label="Group fit ${place.balancedFit.toFixed(2)} out of 1"><strong>${escapeHtml(place.balancedFit.toFixed(2))}</strong><small>GROUP FIT</small></span></div><h3 class="rec-title">${escapeHtml(place.name)}</h3><p class="rec-meta"><span>RESTAURANT</span><i>·</i>${escapeHtml(place.location || plan.city)}</p><div class="fit-meter" role="img" aria-label="Group fit ${percent} percent"><span style="width:${Math.min(100, percent)}%"></span></div><p class="score-caption">Match strength for each person · higher is stronger</p><div class="score-list">${scoreRows}</div>${tags ? `<div class="place-tags">${tags}</div>` : ""}<a class="rec-link" href="${escapeHtml(place.url)}" target="_blank" rel="noreferrer">View on Maps <span aria-hidden="true">↗</span></a></article>`;
+    return `<article class="rec-card"><div class="rec-topline"><span class="rec-type">IN EVERY DINER’S QLOO LIST <b>0${index + 1}</b></span><span class="fair-score" title="Harmonic mean of individual Qloo affinities" aria-label="Balanced group fit ${place.balancedFit.toFixed(2)} out of 1"><strong>${escapeHtml(place.balancedFit.toFixed(2))}</strong><small>BALANCED FIT</small></span></div><h3 class="rec-title">${escapeHtml(place.name)}</h3><p class="rec-meta"><span>RESTAURANT</span><i>·</i>${escapeHtml(place.location || plan.city)}</p><div class="fit-meter" role="img" aria-label="Balanced group fit ${percent} percent"><span style="width:${Math.min(100, percent)}%"></span></div><p class="score-caption">Qloo affinity by diner · higher is a stronger model match</p><div class="score-list">${scoreRows}</div>${weakestFitNote}${tags ? `<div class="place-tags">${tags}</div>` : ""}<a class="rec-link" href="${escapeHtml(place.url)}" target="_blank" rel="noreferrer">View on Maps <span aria-hidden="true">↗</span></a></article>`;
   }).join("");
   resultsNote.hidden = false;
   resultBadge.textContent = `${places.length} ${places.length === 1 ? "PLACE" : "PLACES"} FOR YOUR TABLE`;
-  context.textContent = `We found ${places.length === 1 ? "a place" : "places"} that came through for ${people.join(" + ")} near ${plan.city}. Compare how each one fits, then pick the table that feels right.`;
+  context.textContent = `${places.length === 1 ? "This restaurant appeared" : "These restaurants appeared"} in every diner’s independent Qloo results near ${plan.city}. Compare the individual fits and choose together.`;
   refreshButton.hidden = false;
 }
 
