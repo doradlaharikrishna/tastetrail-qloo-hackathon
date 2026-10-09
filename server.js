@@ -15,6 +15,7 @@ const requestsByIp = new Map();
 const citySearchesByIp = new Map();
 const citySuggestionCache = new Map();
 const favoriteCache = new Map();
+const diningTagCache = new Map();
 const qlooRequestSpacingMs = 400;
 let qlooRequestQueue = Promise.resolve();
 let lastQlooRequestAt = 0;
@@ -253,6 +254,55 @@ export function isExactFavoriteMatch(query, candidateName, type) {
   return !(type === "urn:entity:place" && !normalizedQuery.includes(" "));
 }
 
+const diningTagTypePrefixes = [
+  "urn:tag:genre:restaurant",
+  "urn:tag:cuisine",
+  "urn:tag:menu_highlight",
+  "urn:tag:ambience",
+  "urn:tag:decor"
+];
+
+function resultTags(payload) {
+  const results = payload?.results;
+  if (Array.isArray(results)) return results;
+  if (Array.isArray(results?.tags)) return results.tags;
+  if (Array.isArray(results?.entities)) return results.entities;
+  if (Array.isArray(payload?.tags)) return payload.tags;
+  return [];
+}
+
+function diningTagDetails(tag) {
+  return {
+    id: cleanText(tag?.tag_id || tag?.entity_id || tag?.id, 180),
+    name: cleanText(tag?.name || tag?.title, 100),
+    type: cleanText(tag?.type || tag?.tag_type, 160)
+  };
+}
+
+export function isExactDiningTagMatch(query, tag) {
+  const details = diningTagDetails(tag);
+  return Boolean(
+    details.id
+    && details.name
+    && normalizeFavorite(query) === normalizeFavorite(details.name)
+    && diningTagTypePrefixes.some((prefix) => details.type === prefix || details.type.startsWith(`${prefix}:`))
+  );
+}
+
+async function lookupDiningTag(query) {
+  const normalizedQuery = normalizeFavorite(query);
+  const cached = diningTagCache.get(normalizedQuery);
+  if (cached && cached.expiresAt > Date.now()) return cached.tag;
+
+  const search = new URLSearchParams({ "filter.query": query, take: "10" });
+  const payload = await qlooRequest(`/v2/tags?${search}`);
+  const candidate = resultTags(payload).find((tag) => isExactDiningTagMatch(query, tag));
+  const match = candidate ? diningTagDetails(candidate) : null;
+  diningTagCache.set(normalizedQuery, { tag: match, expiresAt: Date.now() + 30 * 60 * 1000 });
+  if (diningTagCache.size > 500) diningTagCache.delete(diningTagCache.keys().next().value);
+  return match;
+}
+
 async function lookupFavorite(query) {
   const normalizedQuery = normalizeFavorite(query);
   const cached = favoriteCache.get(normalizedQuery);
@@ -343,7 +393,12 @@ export async function sharedLunchPlan({ city, participants, excludeIds = [] }) {
     name: cleanText(participant?.name, 40) || `Person ${index + 1}`,
     favorites: Array.isArray(participant?.favorites)
       ? participant.favorites.map((favorite) => cleanText(favorite, 80)).filter(Boolean).slice(0, 3)
-      : []
+      : [],
+    diningPreferences: Array.isArray(participant?.diningPreferences)
+      ? participant.diningPreferences.map((preference) => cleanText(preference, 80)).filter(Boolean).slice(0, 4)
+      : typeof participant?.diningPreferences === "string"
+        ? participant.diningPreferences.split(",").map((preference) => cleanText(preference, 80)).filter(Boolean).slice(0, 4)
+        : []
   })) : [];
   if (!city) throw Object.assign(new Error("Add a city to find a shared lunch."), { status: 400 });
   if (participants.length < 2) throw Object.assign(new Error("Add at least two people so we can find a fair match."), { status: 400 });
@@ -355,7 +410,7 @@ export async function sharedLunchPlan({ city, participants, excludeIds = [] }) {
     return {
       mode: "preview",
       city,
-      participants: participants.map(({ name, favorites }) => ({ name, matchedFavorites: favorites })),
+      participants: participants.map(({ name, favorites, diningPreferences }) => ({ name, matchedFavorites: favorites, diningPreferences })),
       places: []
     };
   }
@@ -367,12 +422,24 @@ export async function sharedLunchPlan({ city, participants, excludeIds = [] }) {
       const match = await lookupFavorite(input);
       if (!match) {
         throw Object.assign(new Error(
-          `I couldn’t match “${input}” to an exact Qloo name for ${participant.name}, so I didn’t use it or guess at a lookalike. Enter a specific person, artist, film, brand, or place name they already like. Cuisine, spice, portion size, and ambience are dining requirements, not taste anchors.`
+          `I couldn’t match “${input}” to an exact Qloo name for ${participant.name}, so I didn’t use it or guess at a lookalike. Enter a specific person, artist, film, brand, or place name as their taste anchor. For food, spice, price, or atmosphere, use Food & dining preferences; portion size and current menus can’t be verified by Qloo.`
         ), { status: 422 });
       }
       favorites.push(match);
     }
-    resolvedParticipants.push({ id: `person-${index + 1}`, name: participant.name, favorites });
+    const diningTags = [];
+    const unverifiedDiningPreferences = [];
+    for (const preference of participant.diningPreferences) {
+      try {
+        const tag = await lookupDiningTag(preference);
+        if (tag) diningTags.push(tag);
+        else unverifiedDiningPreferences.push(preference);
+      } catch (error) {
+        if (error.upstreamStatus === 429 || error.upstreamStatus >= 500) throw error;
+        unverifiedDiningPreferences.push(preference);
+      }
+    }
+    resolvedParticipants.push({ id: `person-${index + 1}`, name: participant.name, favorites, diningTags, unverifiedDiningPreferences });
   }
 
   const perPersonResults = await Promise.all(resolvedParticipants.map(async (participant) => {
@@ -385,6 +452,9 @@ export async function sharedLunchPlan({ city, participants, excludeIds = [] }) {
       "take": 50,
       "feature.explainability": true
     };
+    if (participant.diningTags.length) {
+      body["signal.interests.tags"] = participant.diningTags.map(({ id }) => ({ tag: id, weight: 7 }));
+    }
     if (excludeIds.length) body["filter.exclude.entities"] = excludeIds.join(",");
     const insight = await qlooRequest("/v2/insights", {
       method: "POST",
@@ -406,11 +476,17 @@ export async function sharedLunchPlan({ city, participants, excludeIds = [] }) {
       candidate.affinities.set(participant.id, affinity);
       const explainedSignals = entity?.query?.explainability?.["signal.interests.entities"] || [];
       const participantSignals = new Map(participant.favorites.map((favorite) => [favorite.id, favorite.name]));
-      const matched = explainedSignals
+      const matchedEntities = explainedSignals
         .filter((signal) => signal.score >= 0.1 && participantSignals.has(signal.entity_id))
         .sort((left, right) => right.score - left.score)
         .map((signal) => participantSignals.get(signal.entity_id));
-      candidate.signalNames.set(participant.id, matched);
+      const explainedTags = entity?.query?.explainability?.["signal.interests.tags"] || [];
+      const participantTags = new Map(participant.diningTags.map((tag) => [tag.id, tag.name]));
+      const matchedTags = explainedTags
+        .filter((signal) => signal.score >= 0.1 && participantTags.has(signal.tag_id || signal.entity_id || signal.tag))
+        .sort((left, right) => right.score - left.score)
+        .map((signal) => participantTags.get(signal.tag_id || signal.entity_id || signal.tag));
+      candidate.signalNames.set(participant.id, [...matchedEntities, ...matchedTags]);
       candidates.set(id, candidate);
     }
   }
@@ -469,6 +545,11 @@ export async function sharedLunchPlan({ city, participants, excludeIds = [] }) {
     occasion: "Lunch",
     participantNames: resolvedParticipants.map(({ name }) => name),
     matchedFavorites: resolvedParticipants.map(({ name, favorites }) => ({ name, favorites: favorites.map(({ name }) => name) })),
+    diningPreferences: resolvedParticipants.map(({ name, diningTags, unverifiedDiningPreferences }) => ({
+      name,
+      usedByQloo: diningTags.map(({ name: preference }) => preference),
+      unverified: unverifiedDiningPreferences
+    })),
     ranking: "harmonic-mean-of-individual-qloo-affinity",
     places
   };
@@ -484,7 +565,10 @@ async function handleSharedLunch(request, response) {
       name: cleanText(participant?.name, 40) || `Person ${index + 1}`,
       favorites: Array.isArray(participant?.favorites)
         ? participant.favorites.map((favorite) => cleanText(favorite, 80)).filter(Boolean).slice(0, 3)
-        : cleanText(participant?.favorites, 240).split(",").map((favorite) => cleanText(favorite, 80)).filter(Boolean).slice(0, 3)
+        : cleanText(participant?.favorites, 240).split(",").map((favorite) => cleanText(favorite, 80)).filter(Boolean).slice(0, 3),
+      diningPreferences: Array.isArray(participant?.diningPreferences)
+        ? participant.diningPreferences.map((preference) => cleanText(preference, 80)).filter(Boolean).slice(0, 4)
+        : cleanText(participant?.diningPreferences, 320).split(",").map((preference) => cleanText(preference, 80)).filter(Boolean).slice(0, 4)
     }));
     const excludeIds = Array.isArray(input.excludeIds)
       ? input.excludeIds.map((id) => cleanText(id, 100)).filter((id) => /^[\w-]+$/.test(id)).slice(0, 15)
@@ -524,7 +608,8 @@ const mcpTool = {
           required: ["name", "favorites"],
           properties: {
             name: { type: "string", description: "Display name for this person's taste profile." },
-            favorites: { type: "array", minItems: 1, maxItems: 3, items: { type: "string" }, description: "One to three exact Qloo entity names this person likes: a specific person, artist, film, brand, or place. Do not use dining requirements such as cuisine, spice, portion size, or ambience." }
+            favorites: { type: "array", minItems: 1, maxItems: 3, items: { type: "string" }, description: "One to three exact Qloo entity names this person likes: a specific person, artist, film, brand, or place. Put cuisine, food, atmosphere, or price preferences in diningPreferences." },
+            diningPreferences: { type: "array", maxItems: 4, items: { type: "string" }, description: "Optional food, cuisine, atmosphere, or price preferences. Only exact restaurant-relevant Qloo tag matches influence affinity; unrecognized notes such as portion size are returned as unverified and not sent to Qloo." }
           }
         }
       }

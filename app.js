@@ -30,9 +30,10 @@ function memberCard(person = {}) {
   const number = peopleGrid.children.length + 1;
   const name = escapeHtml(person.name || (number === 1 ? "You" : number === 2 ? "Lunch buddy" : `Person ${number}`));
   const favorites = escapeHtml(Array.isArray(person.favorites) ? person.favorites.join(", ") : person.favorites || "");
+  const diningPreferences = escapeHtml(Array.isArray(person.diningPreferences) ? person.diningPreferences.join(", ") : person.diningPreferences || "");
   const card = document.createElement("article");
   card.className = "person-card";
-  card.innerHTML = `<div class="person-top"><span class="person-avatar" aria-hidden="true">${number.toString().padStart(2, "0")}</span><label class="person-name-label">Name <input class="person-name" maxlength="40" value="${name}" aria-label="Person ${number} name" /></label><button class="remove-person" type="button" aria-label="Remove person ${number}" ${number <= 2 ? "disabled" : ""}>×</button></div><label class="person-taste-label">Specific names they already like<input class="person-favorites" maxlength="240" value="${favorites}" placeholder="e.g. Virat Kohli, Taylor Swift" aria-label="Person ${number} taste anchors" required /></label><span class="person-hint">Use exact people, artists, films, brands or places—not cuisine or dining requirements.</span>`;
+  card.innerHTML = `<div class="person-top"><span class="person-avatar" aria-hidden="true">${number.toString().padStart(2, "0")}</span><label class="person-name-label">Name <input class="person-name" maxlength="40" value="${name}" aria-label="Person ${number} name" /></label><button class="remove-person" type="button" aria-label="Remove person ${number}" ${number <= 2 ? "disabled" : ""}>×</button></div><label class="person-taste-label">Specific names they already like<input class="person-favorites" maxlength="240" value="${favorites}" placeholder="e.g. Virat Kohli, Taylor Swift" aria-label="Person ${number} taste anchors" required /></label><span class="person-hint">Named people, artists, films, brands, or places Qloo can identify.</span><label class="person-dining-label">Food & dining preferences<input class="person-dining" maxlength="240" value="${diningPreferences}" placeholder="e.g. biryani, spicy, quiet atmosphere" aria-label="Person ${number} food and dining preferences" /></label><span class="person-hint">Supported Qloo tags can influence ranking. Portion and menu details are not verified.</span>`;
   card.querySelector(".remove-person").addEventListener("click", () => {
     if (peopleGrid.children.length <= 2) return;
     card.remove();
@@ -49,6 +50,7 @@ function refreshMemberControls() {
     card.querySelector(".person-avatar").textContent = String(index + 1).padStart(2, "0");
     card.querySelector(".person-name").setAttribute("aria-label", `Person ${index + 1} name`);
     card.querySelector(".person-favorites").setAttribute("aria-label", `Person ${index + 1} favorites`);
+    card.querySelector(".person-dining").setAttribute("aria-label", `Person ${index + 1} food and dining preferences`);
     const removeButton = card.querySelector(".remove-person");
     removeButton.disabled = cards.length <= 2;
     removeButton.setAttribute("aria-label", `Remove person ${index + 1}`);
@@ -59,7 +61,8 @@ function refreshMemberControls() {
 function collectTable() {
   return [...peopleGrid.children].map((card, index) => ({
     name: card.querySelector(".person-name").value.trim() || `Person ${index + 1}`,
-    favorites: card.querySelector(".person-favorites").value.split(",").map((favorite) => favorite.trim()).filter(Boolean).slice(0, 3)
+    favorites: card.querySelector(".person-favorites").value.split(",").map((favorite) => favorite.trim()).filter(Boolean).slice(0, 3),
+    diningPreferences: card.querySelector(".person-dining").value.split(",").map((preference) => preference.trim()).filter(Boolean).slice(0, 4)
   }));
 }
 
@@ -209,6 +212,10 @@ function renderPlan(plan) {
   resultsNote.hidden = false;
   resultBadge.textContent = `${places.length} ${places.length === 1 ? "PLACE" : "PLACES"} FOR YOUR TABLE`;
   context.textContent = `${places.length === 1 ? "This restaurant appeared" : "These restaurants appeared"} in every diner’s independent Qloo results near ${plan.city}. Compare the individual fits and choose together.`;
+  const usedDiningPreferences = (plan.diningPreferences || []).flatMap((person) => person.usedByQloo?.map((preference) => `${person.name}: ${preference}`) || []);
+  const unverifiedDiningPreferences = (plan.diningPreferences || []).flatMap((person) => person.unverified?.map((preference) => `${person.name}: ${preference}`) || []);
+  if (usedDiningPreferences.length) context.textContent += ` Qloo also used these dining tags to influence affinity: ${usedDiningPreferences.join("; ")}.`;
+  if (unverifiedDiningPreferences.length) context.textContent += ` Not verified by Qloo: ${unverifiedDiningPreferences.join("; ")}. These did not affect ranking; check them with the restaurant.`;
   refreshButton.hidden = false;
 }
 
