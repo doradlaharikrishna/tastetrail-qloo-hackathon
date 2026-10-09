@@ -236,17 +236,27 @@ async function searchCitySuggestions(query) {
   return cities;
 }
 
-async function lookupFavorite(query) {
-  const normalize = (value) => value
+function normalizeFavorite(value) {
+  return value
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
-  const normalizedQuery = normalize(query);
+}
+
+export function isExactFavoriteMatch(query, candidateName, type) {
+  const normalizedQuery = normalizeFavorite(query);
+  if (!normalizedQuery || normalizedQuery !== normalizeFavorite(candidateName)) return false;
+  // A one-word place result can turn a cuisine or adjective into a restaurant
+  // signal without the diner intending to name that business.
+  return !(type === "urn:entity:place" && !normalizedQuery.includes(" "));
+}
+
+async function lookupFavorite(query) {
+  const normalizedQuery = normalizeFavorite(query);
   const cached = favoriteCache.get(normalizedQuery);
   if (cached && cached.expiresAt > Date.now()) return cached.match;
-  const queryTokens = new Set(normalizedQuery.split(" ").filter(Boolean));
   const typePriority = new Map([["urn:entity:person", 0], ["urn:entity:artist", 1], ["urn:entity:movie", 2], ["urn:entity:place", 3]]);
   const matches = [];
   for (const type of entityTypes) {
@@ -256,15 +266,7 @@ async function lookupFavorite(query) {
       matches.push(...resultEntities(payload)
         .filter((entity) => entityId(entity) && entity.name)
         .map((entity) => {
-          const name = normalize(entity.name);
-          const tokens = new Set(name.split(" ").filter(Boolean));
-          const overlap = [...queryTokens].filter((token) => tokens.has(token)).length;
-          const isSingleTokenPlaceExact = type === "urn:entity:place" && queryTokens.size === 1 && name === normalizedQuery;
-          const score = name === normalizedQuery && !isSingleTokenPlaceExact
-            ? 100
-            : queryTokens.size && overlap === queryTokens.size
-              ? 60
-              : 0;
+          const score = isExactFavoriteMatch(query, entity.name, type) ? 100 : 0;
           return { id: entityId(entity), name: entity.name, type, score };
         }));
       if (matches.some((match) => match.score === 100)) break;
@@ -272,7 +274,7 @@ async function lookupFavorite(query) {
       if ([401, 403, 404, 429].includes(error.upstreamStatus) || error.upstreamStatus >= 500) throw error;
     }
   }
-  const match = matches.filter((candidate) => candidate.score > 0)
+  const match = matches.filter((candidate) => candidate.score === 100)
     .sort((left, right) => right.score - left.score || typePriority.get(left.type) - typePriority.get(right.type))[0] || null;
   favoriteCache.set(normalizedQuery, { match, expiresAt: Date.now() + 30 * 60 * 1000 });
   if (favoriteCache.size > 500) favoriteCache.delete(favoriteCache.keys().next().value);
@@ -281,12 +283,18 @@ async function lookupFavorite(query) {
 
 async function liveTrail({ city, favorites, occasion, excludeIds }) {
   if (!favorites.length) {
-    throw Object.assign(new Error("Add at least one artist, film, cuisine, or place for live taste matching."), { status: 400 });
+    throw Object.assign(new Error("Add at least one specific person, artist, film, brand, or place name for live taste matching."), { status: 400 });
   }
 
-  const resolved = (await Promise.all(favorites.map(lookupFavorite))).filter(Boolean);
-  if (!resolved.length) {
-    throw Object.assign(new Error("I couldn’t match those favorites in Qloo. Try a specific artist, film, restaurant, or place name."), { status: 422 });
+  const resolved = [];
+  for (const input of favorites) {
+    const match = await lookupFavorite(input);
+    if (!match) {
+      throw Object.assign(new Error(
+        `I couldn’t match “${input}” to an exact Qloo name, so I didn’t use it or guess at a lookalike. Enter a specific person, artist, film, brand, or place name. Cuisine, spice, portions, and ambience are dining requirements, not taste anchors.`
+      ), { status: 422 });
+    }
+    resolved.push(match);
   }
 
   const body = {
@@ -329,7 +337,7 @@ function balancedAffinity(scores) {
   return validScores.length / validScores.reduce((total, score) => total + (1 / score), 0);
 }
 
-async function sharedLunchPlan({ city, participants, excludeIds = [] }) {
+export async function sharedLunchPlan({ city, participants, excludeIds = [] }) {
   city = cleanText(city, 90);
   participants = Array.isArray(participants) ? participants.slice(0, 4).map((participant, index) => ({
     name: cleanText(participant?.name, 40) || `Person ${index + 1}`,
@@ -352,13 +360,20 @@ async function sharedLunchPlan({ city, participants, excludeIds = [] }) {
     };
   }
 
-  const resolvedParticipants = await Promise.all(participants.map(async (participant, index) => {
-    const favorites = (await Promise.all(participant.favorites.map(lookupFavorite))).filter(Boolean);
-    if (!favorites.length) {
-      throw Object.assign(new Error(`I couldn’t confidently match ${participant.name}’s taste anchors. Try a specific person, artist, film, brand, or place.`), { status: 422 });
+  const resolvedParticipants = [];
+  for (const [index, participant] of participants.entries()) {
+    const favorites = [];
+    for (const input of participant.favorites) {
+      const match = await lookupFavorite(input);
+      if (!match) {
+        throw Object.assign(new Error(
+          `I couldn’t match “${input}” to an exact Qloo name for ${participant.name}, so I didn’t use it or guess at a lookalike. Enter a specific person, artist, film, brand, or place name they already like. Cuisine, spice, portion size, and ambience are dining requirements, not taste anchors.`
+        ), { status: 422 });
+      }
+      favorites.push(match);
     }
-    return { id: `person-${index + 1}`, name: participant.name, favorites };
-  }));
+    resolvedParticipants.push({ id: `person-${index + 1}`, name: participant.name, favorites });
+  }
 
   const perPersonResults = await Promise.all(resolvedParticipants.map(async (participant) => {
     const body = {
@@ -509,7 +524,7 @@ const mcpTool = {
           required: ["name", "favorites"],
           properties: {
             name: { type: "string", description: "Display name for this person's taste profile." },
-            favorites: { type: "array", minItems: 1, maxItems: 3, items: { type: "string" }, description: "One to three specific artists, people, films, brands, or places this person likes." }
+            favorites: { type: "array", minItems: 1, maxItems: 3, items: { type: "string" }, description: "One to three exact Qloo entity names this person likes: a specific person, artist, film, brand, or place. Do not use dining requirements such as cuisine, spice, portion size, or ambience." }
           }
         }
       }
