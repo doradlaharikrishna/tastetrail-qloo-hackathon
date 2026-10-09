@@ -255,6 +255,7 @@ export function isExactFavoriteMatch(query, candidateName, type) {
 }
 
 const diningTagTypePrefixes = [
+  "urn:tag:specialty_dish:place",
   "urn:tag:genre:restaurant",
   "urn:tag:cuisine",
   "urn:tag:menu_highlight",
@@ -418,26 +419,44 @@ export async function sharedLunchPlan({ city, participants, excludeIds = [] }) {
   const resolvedParticipants = [];
   for (const [index, participant] of participants.entries()) {
     const favorites = [];
+    const diningTags = [];
     for (const input of participant.favorites) {
       const match = await lookupFavorite(input);
       if (!match) {
+        let diningTag = null;
+        try {
+          diningTag = await lookupDiningTag(input);
+        } catch (error) {
+          if (error.upstreamStatus === 429 || error.upstreamStatus >= 500) throw error;
+        }
+        if (diningTag) {
+          diningTags.push(diningTag);
+          continue;
+        }
         throw Object.assign(new Error(
           `I couldn’t match “${input}” to an exact Qloo name for ${participant.name}, so I didn’t use it or guess at a lookalike. Enter a specific person, artist, film, brand, or place name as their taste anchor. For food, spice, price, or atmosphere, use Food & dining preferences; portion size and current menus can’t be verified by Qloo.`
         ), { status: 422 });
       }
       favorites.push(match);
     }
-    const diningTags = [];
     const unverifiedDiningPreferences = [];
     for (const preference of participant.diningPreferences) {
       try {
         const tag = await lookupDiningTag(preference);
-        if (tag) diningTags.push(tag);
-        else unverifiedDiningPreferences.push(preference);
+        if (tag) {
+          if (!diningTags.some((existing) => existing.id === tag.id)) diningTags.push(tag);
+        } else {
+          unverifiedDiningPreferences.push(preference);
+        }
       } catch (error) {
         if (error.upstreamStatus === 429 || error.upstreamStatus >= 500) throw error;
         unverifiedDiningPreferences.push(preference);
       }
+    }
+    if (!favorites.length) {
+      throw Object.assign(new Error(
+        `Qloo recognized ${participant.name}’s dining preference${diningTags.length === 1 ? "" : "s"}, but still needs a specific person, artist, film, brand, or place they like to personalize the match.`
+      ), { status: 422 });
     }
     resolvedParticipants.push({ id: `person-${index + 1}`, name: participant.name, favorites, diningTags, unverifiedDiningPreferences });
   }

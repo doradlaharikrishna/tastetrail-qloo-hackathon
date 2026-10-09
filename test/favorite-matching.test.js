@@ -23,7 +23,7 @@ test("rejects one-word place matches as ambiguous but accepts a full venue name"
 });
 
 test("accepts only exact restaurant-relevant Qloo dining tags", () => {
-  const biryaniTag = { id: "urn:tag:genre:restaurant:Biryani", name: "Biryani", type: "urn:tag:genre:restaurant" };
+  const biryaniTag = { id: "urn:tag:specialty_dish:place:biryani", name: "Biryani", type: "urn:tag:specialty_dish:place" };
   assert.equal(isExactDiningTagMatch("biryani", biryaniTag), true);
   assert.equal(isExactDiningTagMatch("biryani", { ...biryaniTag, name: "Ghar Banduk Biryani" }), false);
   assert.equal(isExactDiningTagMatch("Biryani", { ...biryaniTag, type: "urn:tag:genre:media:Biryani" }), false);
@@ -50,12 +50,12 @@ test("does not call Insights when a generic input only partially matches an enti
       sharedLunchPlan({
         city: "Bengaluru",
         participants: [
-          { name: "Hari", favorites: ["biryani", "spicy", "more quantity"] },
+          { name: "Hari", favorites: ["spicy"] },
           { name: "Chandrika", favorites: ["Taylor Swift"] }
         ]
       }),
       (error) => error.status === 422
-        && error.message.includes("couldn’t match “biryani”")
+        && error.message.includes("couldn’t match “spicy”")
         && error.message.includes("didn’t use it or guess at a lookalike")
     );
     assert.equal(requests.some((url) => url.includes("/v2/insights")), false);
@@ -64,7 +64,7 @@ test("does not call Insights when a generic input only partially matches an enti
   }
 });
 
-test("uses exact dining tags as Qloo taste signals and returns unsupported notes as unverified", async () => {
+test("routes an exact cuisine tag entered as a favorite into dining signals", async () => {
   const originalFetch = globalThis.fetch;
   const insightBodies = [];
   const requests = [];
@@ -74,7 +74,7 @@ test("uses exact dining tags as Qloo taste signals and returns unsupported notes
     if (parsed.pathname === "/v2/tags") {
       const query = parsed.searchParams.get("filter.query");
       const tags = query?.toLowerCase() === "biryani"
-        ? [{ id: "urn:tag:genre:restaurant:Biryani", name: "Biryani", type: "urn:tag:genre:restaurant:Biryani" }]
+        ? [{ id: "urn:tag:specialty_dish:place:biryani", name: "Biryani", type: "urn:tag:specialty_dish:place" }]
         : [];
       return new Response(JSON.stringify({ results: { tags } }), { status: 200 });
     }
@@ -107,14 +107,15 @@ test("uses exact dining tags as Qloo taste signals and returns unsupported notes
     const plan = await sharedLunchPlan({
       city: "Bengaluru",
       participants: [
-        { name: "Hari", favorites: ["Virat Kohli"], diningPreferences: ["biryani", "more quantity"] },
+        { name: "Hari", favorites: ["Virat Kohli", "biryani"], diningPreferences: ["more quantity"] },
         { name: "Chandrika", favorites: ["Taylor Swift"], diningPreferences: ["Biryani"] }
       ]
     });
-    const biryaniSignal = { tag: "urn:tag:genre:restaurant:Biryani", weight: 7 };
+    const biryaniSignal = { tag: "urn:tag:specialty_dish:place:biryani", weight: 7 };
     assert.equal(plan.diningPreferences[0].usedByQloo[0], "Biryani");
     assert.deepEqual(plan.diningPreferences[0].unverified, ["more quantity"]);
     assert.equal(plan.diningPreferences[1].usedByQloo[0], "Biryani");
+    assert.deepEqual(plan.matchedFavorites[0].favorites, ["Virat Kohli"]);
     assert.ok(insightBodies.every((body) => body["signal.interests.tags"]?.some((tag) => tag.tag === biryaniSignal.tag)));
     assert.ok(requests.filter((path) => path === "/v2/tags").length <= 2, "identical dining tags are deduplicated by the result cache");
     assert.ok(plan.places[0].affinityByParticipant.every((person) => person.signals.includes("Biryani")));
